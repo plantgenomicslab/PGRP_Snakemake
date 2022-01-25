@@ -1,0 +1,36 @@
+{
+  "samples":[
+    "SRR2970804",
+    "SRR2970803"
+  ],
+  "replicates":[
+    "1", "2"
+  ],
+  "maxThreads":
+    4,
+  "genomeDir":
+    "~/snakemake_scratch/reference/",
+  "bamPath":
+    "~/snakemake_scratch/bam/",
+  "reference":[
+    "reference/Athaliana_167.fa",
+    "reference/Athaliana_167_gene.gff3",
+    "reference/Athaliana_167_gene.gtf",
+    "reference/Genome",
+    "reference/Log.out",
+    "reference/SA",
+    "reference/SAindex",
+    "reference/chrLength.txt",
+    "reference/chrName.txt",
+    "reference/chrNameLength.txt",
+    "reference/chrStart.txt",
+    "reference/exonGeTrInfo.tab",
+    "reference/exonInfo.tab",
+    "reference/geneInfo.tab",
+    "reference/genomeParameters.txt",
+    "reference/sjdbInfo.txt",
+    "reference/sjdbList.fromGTF.out.tab",
+    "reference/sjdbList.out.tab",
+    "reference/transcriptInfo.tab"
+  ]
+ }
