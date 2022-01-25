@@ -1,24 +1,61 @@
+import sys
+import os
+import pandas as pd
+SAMPLE_FILE = pd.read_table('sraid.txt', sep="\s+", dtype=str).set_index("sample", drop=False)  # enforce str in index
+SAMPLE_LIST = SAMPLE_FILE["sample"].values.tolist()
+
+##Create sample output folders
+os.makedirs("output/logs/", exist_ok=True)
+for path in SAMPLE_LIST:
+    os.makedirs("output/" + path + "/stat/", exist_ok=True)
+    os.makedirs("output/" + path + "/raw/", exist_ok=True)
+    os.makedirs("output/" + path + "/SRA/", exist_ok=True)
+	os.makedirs("output/" + path + "/bam/", exist_ok=True)
+
+
+#REF_FILES = ['TAIR10_chr_all.fas',  'TAIR10_GFF3_genes.gff']
+#missing_files = 0
+#os.makedirs('ref', exist_ok=True)
+#for ref in REF_FILES:
+#    if not os.path.exists('ref/' + ref):
+#        missing_files = 1
+#if missing_files:
+#    os.system('curl -L https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_gff3/TAIR10_GFF3_genes.gff > ref/TAIR10_GFF3_genes.gff; curl -L https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas > ref/TAIR10_chr_all.fas')
+
+
 configfile: "config.json"
 
 rule all:
     input:
-        expand("bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=config["samples"])
+    ### Add step by step output for expand
+        expand("output/}sample/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST)
 
 rule downloadSRA:
-    input:
-        expand("{reference}", reference=config["reference"])
-    output:
-        expand("raw_data/{sample}_{replicate}.fastq.gz",
-            sample=config["samples"],
-            replicate=config["replicates"])
+    message: "---Downloading SRA files---"
+#	input:
+		#expand("{reference}", reference=config["reference"])
+	threads: config["downloadSRA"]["threads"]
+	replicate: config["replicates"]
+    output: "output/{sample}/raw/{sample}_{replicate}.fastq.gz"
+		#expand("raw_data/{sample}_{replicate}.fastq.gz",
+         #   sample=config["samples"],
+         #   replicate=config["replicates"])
     log:
-        "logs/fastq-dump.log"
+        "output/logs/{sample}_fastq-dump.log"
     run:
-        for sample in config["samples"]:
-            shell("prefetch " + sample)
-            shell("parallel-fastq-dump --sra-id " + sample +
-                  " --threads " + str(config["maxThreads"]) +
-                  " --split-3 --outdir ./raw_data  --gzip 2> {log}")
+		shell("prefetch {wildcards.sample} --output-file output/{wildcards.sample}/SRA")
+		shell("parallel-fastq-dump --sra-id {wildcards.sample} \
+				--threads {threads} --split-3 --gzip \
+				--outdir output/{wildcards.sample}/raw \
+				2> {log}"
+			  
+		
+		
+        #for sample in config["samples"]:
+        #    shell("prefetch " + sample)
+        #    shell("parallel-fastq-dump --sra-id " + sample +
+        #          " --threads " + str(config["maxThreads"]) +
+        #          " --split-3 --outdir ./raw_data  --gzip 2> {log}")
 
 rule trim:
     input:
