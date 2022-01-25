@@ -1,0 +1,54 @@
+{
+	"__default__":{
+		"datadir": "ref/",
+		"snakedir": "/data/gpfs/home/flunalopez/scratch/data/allhic/ALLHiC_Pipeline",
+		"trims": "test_data/trimmed_reads/",
+		"fasta": "test.contigs.fasta",
+		"groups": 11,
+		"enzyme_sites": "GATC",
+		"split": 80,
+		"threads": 16
+	},
+	"trim_galore":{
+		"threads": 8
+	},
+	"split":{
+		"threads": 8
+	},
+	"bwa_mem":{
+		"threads": 8
+	},
+	"preprocess_sams":{
+		"threads": 2
+	},
+	"filterBAM":{
+		"threads": 2
+	},
+	"merge_clean":{
+		"threads": 8
+	},
+	"bwa_mem_fixed":{
+		"threads": 8
+	},
+	"preprocess_sams_fixed":{
+		"threads": 2
+	},
+	"filterBAM_fixed":{
+		"threads": 2
+	},
+	"merge_fixed_bam":{
+		"threads": 8
+	},
+	"allhic_corrector":{
+		"threads": 32
+	},
+	"partition":{
+		"threads": 4 
+	},
+	"optimize":{
+		"threads": 2
+	},
+	"chrn_list":{
+		"threads": 4
+	}
+}
