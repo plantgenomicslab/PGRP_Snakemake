@@ -21,27 +21,26 @@ cf.close()
 # Check for an indexed reference genome based on required files in config.json
 for ref in config_dict["ref"]:
     if not os.path.exists(ref):
-        print("The " + ref + " file is missing. Have you downlodaed and indexed a refernce genome? Terminating...")
+        print("The " + ref + " file is missing. Have you downloaded and indexed a refernce genome? Terminating...")
         exit()
 
 configfile: "config.json"
 
 rule all:
     input:
-        expand("output/{sample}/SRA/{sample}.sra", sample=SAMPLE_LIST)
-        expand("output/{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=["1", "2"])
-        expand("output/{sample}/trim/{sample}_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=["1", "2"])
+        expand("output/{sample}/SRA/{sample}.sra", sample=SAMPLE_LIST),
+        expand("output/{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=["1", "2"]),
+        expand("output/{sample}/trim/{sample}_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=["1", "2"]),
         expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST)
 
 rule downloadSRA:
     message: "-----Downloading SRA files-----"
-	threads: config["threads"]["downloadSRA"]
-	replicate: ["1", "2"]
     output: "output/{sample}/raw/{sample}_{replicate}.fastq.gz"
+    threads: config["threads"]["downloadSRA"]
     log: "output/{sample}/logs/{sample}_downloadSRA.log"
     run:
-		shell("prefetch {wildcards.sample} --output-file output/{wildcards.sample}/SRA")
-		shell("parallel-fastq-dump --sra-id {wildcards.sample} \
+        shell("prefetch {wildcards.sample} --output-file output/{wildcards.sample}/SRA")
+        shell("parallel-fastq-dump --sra-id {wildcards.sample} \
 				--threads {threads} --split-3 --gzip \
 				--outdir output/{wildcards.sample}/raw \
 				2> {log}")
