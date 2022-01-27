@@ -95,4 +95,4 @@ rule featureCounts:
     input: expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST)
     output: "output/counts/featureCounts.cnt"
     log: "output/counts/featureCounts.log"
-    shell: "featureCounts -o output/counts/featureCounts.cnt -p -a {input} 2> {log}"
+    shell: "featureCounts -o output/counts/featureCounts.cnt -p -a " + config_dict["GTFname"] + " {input} 2> {log}"

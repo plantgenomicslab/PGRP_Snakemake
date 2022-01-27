@@ -5,6 +5,7 @@
     "align": 4
   },
   "genomeDir":"ref/",
+  "GTFname":"ref/Athaliana_167_gene.gtf",
   "ref":[
     "ref/SA",
     "ref/SAindex",
