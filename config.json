@@ -4,10 +4,7 @@
     "trim": 4,
     "align": 4
   },
-  "genomeDir":
-    "ref/",
-  "bamPath":
-    "bam/",
+  "genomeDir":"ref/",
   "ref":[
     "ref/SA",
     "ref/SAindex",
