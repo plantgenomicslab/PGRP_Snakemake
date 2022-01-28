@@ -17,10 +17,6 @@ cf = open("config.json")
 config_dict = json.load(cf)
 cf.close()
 
-# Update sratools config to direct .sra files to specified location
-# Note: prefetch automatically places downloaded files in a subfolder called 'sra'
-os.system('echo "/repository/user/main/public/root = \\"' + config_dict["sraLocation"] +  '\\"" > $HOME/.ncbi/user-settings.mkfg')
-
 # Check for an indexed reference genome based on required files in config.json
 for ref in config_dict["ref"]:
     if not os.path.exists(ref):
@@ -43,7 +39,7 @@ rule fetchSRA:
     output: "output/sra/{sample}.sra"
     threads: config["threads"]["fetchSRA"]
     run:
-        shell("prefetch {wildcards.sample}")
+        shell("prefetch {wildcards.sample} --output-file output/sra/{wildcards.sample}.sra")
 
 rule downloadSRA:
     message: "-----Downloading Fastq files-----"
@@ -58,14 +54,18 @@ rule downloadSRA:
 				2> {log}")
 
 rule trim:
-    input: "output/{sample}/raw/{sample}_{replicate}.fastq.gz"
-    output:"output/{sample}/trim/{sample}_{replicate}.fq.gz"
+    input: 
+        fwd_fastq = "output/{sample}/raw/{sample}_1.fastq.gz",
+        rev_fastq = "output/{sample}/raw/{sample}_2.fastq.gz"
+    output:
+        "output/{sample}/trim/{sample}_1.fq.gz",
+        "output/{sample}/trim/{sample}_2.fq.gz"
     log: "output/{sample}/logs/{sample}_trim.log"
     threads: config["threads"]["trim"]
     run:
-        shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 \
-             5 --cores 2 --max_n 40 --gzip -o output/{wildcards.sample}/trim output/{wildcards.sample}/raw/{wildcards.sample}_1.fastq.gz \
-             output/{wildcards.sample}/raw/{wildcards.sample}_2.fastq.gz 2> {log}")
+        shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 5 \
+             --cores 2 --max_n 40 --gzip -o output/{wildcards.sample}/trim {input.fwd_fastq} \
+             {input.rev_fastq} 2> {log}")
         shell("for file in output/{wildcards.sample}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
         shell("fastqc " + " ".join(expand("output/{sample}/trim/{sample}_{replicate}.fq.gz",sample=SAMPLE_LIST,replicate=["1", "2"])))
 
