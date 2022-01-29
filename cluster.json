@@ -1,0 +1,33 @@
+{
+  "__default__": {
+    "account": "cpu-s1-pgl-0",
+    "memory": "16g",
+    "name": "JOBNAME.{rule}.{wildcards}",
+    "ncpus": 1,
+    "nodes": 1,
+    "partition": "cpu-s1-pgl-0",
+    "time": "10-08:00:00",
+    "output": "output/cluster/logs/{rule}.{wildcards}.out",
+    "error": "output/cluster/logs/{rule}.{wildcards}.err"
+  },
+  "fetchSRA":{
+    "ncpus": 2,
+	"memory": "32g"
+  },
+  "downloadSRA":{
+    "ncpus": 4,
+	"memory": "32g"
+  },
+  "trim":{
+    "ncpus": 8,
+	"memory": "32g"
+  },
+  "align":{
+    "ncpus": 16,
+	"memory": "32g"
+  },
+  "featureCounts":{
+    "ncpus": 16,
+	"memory": "32g"
+  }
+}

@@ -1,8 +1,9 @@
 {"threads":{
     "fetchSRA":4,
-    "downloadSRA":4,
-    "trim": 4,
-    "align": 4
+    "downloadSRA":8,
+    "trim": 8,
+    "align": 16,
+    "featureCount":16
   },
   "genomeDir":"ref/",
   "GTFname":"ref/Athaliana_167_gene.gtf",

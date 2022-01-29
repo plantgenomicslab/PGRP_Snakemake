@@ -80,16 +80,17 @@ rule align:
     log: "output/{sample}/logs/{sample}_align.log"
     threads: config["threads"]["align"]
     run:
-        shell("STAR --runMode alignReads --runThreadN 1 \
-                --readFilesCommand gunzip -c --outFilterMultimapNmax 10 --alignIntronMin 25 \
+        shell("STAR --runMode alignReads --runThreadN {threads} --readFilesCommand gunzip -c \
+                --outFilterMultimapNmax 10 --alignIntronMin 25 \
                 --alignIntronMax 10000 --genomeDir " + config["genomeDir"]  + " --readFilesIn \
                 output/{wildcards.sample}/trim/{wildcards.sample}_1.fq.gz \
                 output/{wildcards.sample}/trim/{wildcards.sample}_2.fq.gz \
-			--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.sample}/bam/{wildcards.sample}.bam 2> {log}")
+		--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.sample}/bam/{wildcards.sample}.bam 2> {log}")
 
 rule featureCounts:
     message: "-----Generating feature counts-----"
     input: expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST)
     output: "output/counts/featureCounts.cnt"
     log: "output/counts/featureCounts.log"
+    threads: config["threads"]["featureCount"]
     shell: "featureCounts -o output/counts/featureCounts.cnt -p -a " + config_dict["GTFname"] + " {input} 2> {log}"
