@@ -11,23 +11,23 @@
     "error": "output/cluster/logs/{rule}.{wildcards}.err"
   },
   "fetchSRA":{
-    "ncpus": 2,
-	"memory": "32g"
+	  "ncpus": 2,
+	  "memory": "8g"
   },
-  "downloadSRA":{
-    "ncpus": 4,
-	"memory": "32g"
+  "convertSRAtoFastq":{
+	  "ncpus": 8,
+	  "memory": "32g"
   },
   "trim":{
-    "ncpus": 8,
-	"memory": "32g"
+	  "ncpus": 16,
+	  "memory": "64g"
   },
   "align":{
-    "ncpus": 16,
-	"memory": "32g"
+	  "ncpus": 16,
+	  "memory": "64g"
   },
   "featureCounts":{
-    "ncpus": 16,
-	"memory": "32g"
+	  "ncpus": 16,
+	  "memory": "64g"
   }
 }
