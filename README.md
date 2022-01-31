@@ -30,7 +30,9 @@ conda install #####
 
 ## Running pipeline with SLURM scheduler
 ***PLACE HOLDER***
-
+```bash
+sbatch --mem=16g -c 4 --time=13-11:00:00 -o snakemake.out -e snakemake.err --wrap="./run.sh"
+```
 
 ## Citations
 ***PLACE HOLDER***
