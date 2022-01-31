@@ -6,6 +6,10 @@ SAMPLE_LIST = SAMPLE_FILE["sample"].values.tolist()
 
 # Create sample output folders
 os.makedirs("output/counts/", exist_ok=True)
+os.makedirs("output/sra/", exist_ok=True)
+os.makedirs("output/sra/logs/", exist_ok=True)
+os.makedirs("output/logs/", exist_ok=True)
+
 for path in SAMPLE_LIST:
     os.makedirs("output/" + path + "/raw/", exist_ok=True)
     os.makedirs("output/" + path + "/bam/", exist_ok=True)
@@ -37,6 +41,7 @@ rule fetchSRA:
     output: "output/sra/{sample}.sra"
     message: "-----Fetching {wildcards.sample} SRA files-----"
     threads: config["threads"]["fetchSRA"]
+    log: "output/sra/logs/{sample}_downloadSRA.log"
     run:
         shell("prefetch {wildcards.sample} --output-file output/sra/{wildcards.sample}.sra")
 
@@ -47,7 +52,7 @@ rule convertSRAtoFastq:
         "output/{sample}/raw/{sample}_2.fastq.gz"
     message: "-----Downloading {wildcards.sample} Fastq files-----"
     threads: config["threads"]["downloadSRA"]
-    log: "output/{sample}/logs/{sample}_downloadSRA.log"
+    log: "output/{sample}/logs/{sample}_fastqdump.log"
     run:
         shell("parallel-fastq-dump --sra-id {wildcards.sample} \
 				--threads {threads} --split-3 --gzip \
