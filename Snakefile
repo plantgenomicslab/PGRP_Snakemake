@@ -40,7 +40,7 @@ rule fetchSRA:
     run:
         shell("prefetch {wildcards.sample} --output-file output/sra/{wildcards.sample}.sra")
 
-rule downloadSRA:
+rule convertSRAtoFastq:
     input: "output/sra/{sample}.sra"
     output: 
         "output/{sample}/raw/{sample}_1.fastq.gz", 
@@ -66,26 +66,30 @@ rule trim:
     threads: config["threads"]["trim"]
     run:
         shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 5 \
-             --cores 2 --max_n 40 --gzip -o output/{wildcards.sample}/trim {input.fwd_fastq} \
-             {input.rev_fastq} 2> {log}")
-        shell("for file in output/{wildcards.sample}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
-        shell("fastqc {output}")
+             --cores 2 --max_n 40 --gzip -o output/{wildcards.sample}/trim {input.fwd_fastq} {input.rev_fastq} \
+	     2> {log}")
+
+rule fastqc:
+	
+	
+#        shell("for file in output/{wildcards.sample}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
+#        shell("fastqc --threads {threads} {output}")
 
 rule align:
     input: 
-        "output/{sample}/trim/{sample}_1.fq.gz",
-        "output/{sample}/trim/{sample}_2.fq.gz"
+        fwd_fastq = "output/{sample}/trim/{sample}_1.fq.gz",
+        rev_fastq = "output/{sample}/trim/{sample}_2.fq.gz"
     output:"output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
     message: "-----Aligning {wildcards.sample}-----"
     log: "output/{sample}/logs/{sample}_align.log"
     threads: config["threads"]["align"]
     run:
-        shell("STAR --runMode alignReads --runThreadN {threads} --readFilesCommand gunzip -c \
-                --outFilterMultimapNmax 10 --alignIntronMin 25 \
-                --alignIntronMax 10000 --genomeDir " + config["genomeDir"]  + " --readFilesIn \
-                output/{wildcards.sample}/trim/{wildcards.sample}_1.fq.gz \
-                output/{wildcards.sample}/trim/{wildcards.sample}_2.fq.gz \
-		--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.sample}/bam/{wildcards.sample}.bam 2> {log}")
+        shell("STAR --runMode alignReads --runThreadN {threads} \
+                --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 10000 \ 
+		--genomeDir " + config["genomeDir"]  + " \
+	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
+                --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.sample}/bam/{wildcards.sample}.bam  \
+		2> {log}")
 
 rule featureCounts:
     message: "-----Generating feature counts-----"
@@ -93,4 +97,6 @@ rule featureCounts:
     output: "output/counts/featureCounts.cnt"
     log: "output/counts/featureCounts.log"
     threads: config["threads"]["featureCount"]
-    shell: "featureCounts -o output/counts/featureCounts.cnt -p -a " + config_dict["GTFname"] + " {input} 2> {log}"
+    run:
+	shell ("featureCounts -o output/counts/featureCounts.cnt  -T {threads} -p -a " + config_dict["GTFname"] + " {input} \ 
+    		2> {log}")
