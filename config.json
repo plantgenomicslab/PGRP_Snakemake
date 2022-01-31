@@ -1,7 +1,9 @@
 {"threads":{
     "fetchSRA":2,
     "convertSRAtoFastq":8,
+    "fastqc_raw": 2,
     "trim": 16,
+    "fastqc_trim": 2,
     "align": 16,
     "featureCount":16
   },
