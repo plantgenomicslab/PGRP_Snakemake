@@ -1,7 +1,7 @@
 {"threads":{
-    "fetchSRA":4,
-    "downloadSRA":8,
-    "trim": 8,
+    "fetchSRA":2,
+    "convertSRAtoFastq":8,
+    "trim": 16,
     "align": 16,
     "featureCount":16
   },
@@ -11,6 +11,5 @@
     "ref/SA",
     "ref/SAindex",
     "ref/exonGeTrInfo.tab"
-  ],
-  "sraLocation":"/data/gpfs/home/jlomas/PGRP_Snakemake/output"
- }
+  ]
+  }
