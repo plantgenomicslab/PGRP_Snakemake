@@ -34,8 +34,8 @@ rule all:
     input:
         expand("output/sra/{sample}.sra", sample=SAMPLE_LIST),
         expand("output/{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
-        expand("output/{sample}/raw/{sample}_{replicate}_fastqc.zip", sample=SAMPLE_LIST, replicate=REPLICATE_LIST)
-        expand("output/{sample}/trim/{sample}_{replicate}_val_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST)
+        expand("output/{sample}/raw/{sample}_{replicate}_fastqc.zip", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
+        expand("output/{sample}/trim/{sample}_{replicate}_val_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/trim/{sample}_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST),
         "output/counts/featureCounts.cnt"
@@ -51,10 +51,10 @@ rule fetchSRA:
 rule convertSRAtoFastq:
     input: "output/sra/{sample}.sra"
     output:
-        "output/{sample}/raw/{sample}_1.fastq.gz",
+        "Output/{sample}/raw/{sample}_1.fastq.gz",
         "output/{sample}/raw/{sample}_2.fastq.gz"
     message: "-----Downloading {wildcards.sample} Fastq files-----"
-    threads: config["threads"]["downloadSRA"]
+    threads: config["threads"]["convertSRAtoFastq"]
     log: "output/{sample}/logs/{sample}_fastqdump.log"
     run:
         shell("parallel-fastq-dump --sra-id {wildcards.sample} \
@@ -127,5 +127,5 @@ rule featureCounts:
     log: "output/counts/featureCounts.log"
     threads: config["threads"]["featureCount"]
     run:
-	shell ("featureCounts -o output/counts/featureCounts.cnt  -T {threads} -p -a " + config_dict["GTFname"] + " {input} \
+        shell("featureCounts -o output/counts/featureCounts.cnt  -T {threads} -p -a " + config_dict["GTFname"] + " {input} \
     		2> {log}")
