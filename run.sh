@@ -6,7 +6,7 @@ set -e
 snakemake -p --rerun-incomplete --cluster-config cluster.json \
 		--max-jobs-per-second 50 \
 		--max-status-checks-per-second 50 \
-		--jobs 50 \
+		--jobs 150 \
 		--latency-wait 30 \
 		--notemp \
 		--cluster-status ./src/status.py \
