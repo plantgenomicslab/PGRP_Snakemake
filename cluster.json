@@ -1,14 +1,14 @@
 {
   "__default__": {
-    "account": "cpu-s1-pgl-0",
-    "memory": "16g",
-    "name": "JOBNAME.{rule}.{wildcards}",
-    "ncpus": 1,
-    "nodes": 1,
-    "partition": "cpu-s1-pgl-0",
-    "time": "10-08:00:00",
-    "output": "output/cluster/logs/{rule}.{wildcards}.out",
-    "error": "output/cluster/logs/{rule}.{wildcards}.err"
+	  "account": "cpu-s1-pgl-0",
+	  "partition": "cpu-s1-pgl-0",
+	  "memory": "8g",
+	  "name": "JOBNAME.{rule}.{wildcards}",
+	  "ncpus": 2
+	  "nodes": 1,
+	  "time": "10-08:00:00",
+	  "output": "output/logs/{rule}.{wildcards}.out",
+	  "error": "output/logs/{rule}.{wildcards}.err"
   },
   "fetchSRA":{
 	  "ncpus": 2,
