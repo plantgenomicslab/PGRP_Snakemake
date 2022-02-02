@@ -46,19 +46,23 @@ rule fetchSRA:
     threads: config["threads"]["fetchSRA"]
     log: "output/sra/logs/{sample}_downloadSRA.log"
     run:
-        shell("prefetch {wildcards.sample} --output-file output/sra/{wildcards.sample}.sra 2> {log}")
+        shell("prefetch {wildcards.sample} --output-file {output} 2> {log}")
+        # Check sra files to make sure they are valid
+        shell("echo '--------Validating {wildcards.sample}.sra--------'")
+        shell("set +e")
+        shell("if ! vdb-validate {output}; then echo 'vdb-validate found errors in {output}. Check log here:{log}. Exiting......' && exit 1; fi")
 
 rule convertSRAtoFastq:
     input: "output/sra/{sample}.sra"
     output:
-        "Output/{sample}/raw/{sample}_1.fastq.gz",
+        "output/{sample}/raw/{sample}_1.fastq.gz",
         "output/{sample}/raw/{sample}_2.fastq.gz"
-    message: "-----Downloading {wildcards.sample} Fastq files-----"
+    message: "-----Converting {wildcards.sample} SRA to Fastq files-----"
     threads: config["threads"]["convertSRAtoFastq"]
     log: "output/{sample}/logs/{sample}_fastqdump.log"
     run:
         shell("parallel-fastq-dump --sra-id {wildcards.sample} \
-				--threads {threads} --split-3 --gzip \
+				--threads {threads} --split-e --gzip \
 				--outdir output/{wildcards.sample}/raw \
 				2> {log}")
 
@@ -73,7 +77,7 @@ rule fastqc_raw:
     threads: config["threads"]["fastqc_raw"]
     log: "output/{sample}/logs/{sample}_raw_fastqc.log"
     run:
-        shell("fastqc --threads {threads} {output} 2> {log}")
+        shell("fastqc --threads {threads} {input} 2> {log}")
 
 rule trim:
     input:
@@ -119,6 +123,10 @@ rule align:
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
                 --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.sample}/bam/{wildcards.sample}.bam  \
 		2> {log}")
+        # Perform quick check on output bam file to ensure it is not corrupted
+        shell("echo '--------Checking {output}----------'")
+        shell("set +e")
+        shell("if ! samtools quickcheck {output}; then echo 'samtools quickcheck found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule featureCounts:
     message: "-----Generating feature counts-----"

@@ -16,7 +16,7 @@
 	},
 "convertSRAtoFastq":{
 	"ncpus": 8,
-	"memory": "32g"
+	"memory": "64g"
 	},
 "fastqc_raw":{
 	"ncpus": 2,
