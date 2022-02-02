@@ -1,9 +1,6 @@
 # PGRP_Snakemake
 PGRP_Snakemake
 
-***Set up sra-tools default directory: vdb-config  -i --interactive-mode textual
-Type '4', then type your path '[absolute_path]/PGRP_Snakemake/output/sra/'***
-
 ## Introduction
 
 ## Overview of pipeline
@@ -27,6 +24,15 @@ conda activate PGRP_Snakemake
 
 mamba install -c bioconda -c conda-forge trim-galore=0.6.7 sra-tools=2.11.0 STAR htseq=1.99.2  bioconductor-rsubread multiqc=1.11 snakemake=6.15.0 parallel-fastq-dump=0.6.7 bioconductor-tximport samtools=1.14 r-ggplot2 trinity=2.13.2 hisat2  bioconductor-qvalue
 
+```
+### Set-up
+```bash
+# Set up root dierctory for SRA files
+# Enter '4' in interactive editor. Then enter your path: [absolute_path]/PGRP_Snakemake/output
+vdb-config  -i --interactive-mode textual
+
+# Set timeout to 100 seconds
+vdb-config -s /http/timeout/read=100000
 ```
 ## Running pipeline without scheduler
 ***PLACE HOLDER***
