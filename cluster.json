@@ -34,8 +34,16 @@
 	"ncpus": 16,
 	"memory": "64g"
 	},
+"merge":{
+        "ncpus": 16,
+        "memory": "64g"
+        },
 "featureCounts":{
 	"ncpus": 16,
 	"memory": "64g"
-	}
+	},
+"HTseq":{
+        "ncpus": 16,
+        "memory": "64g"
+        }
 }

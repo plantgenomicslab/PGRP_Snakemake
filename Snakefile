@@ -1,9 +1,15 @@
 import sys
 import os
 import pandas as pd
-SAMPLE_FILE = pd.read_table('sraid.txt', sep="\s+", dtype=str).set_index("sample", drop=False)  # enforce str in index
+
+SAMPLE_FILE = pd.read_table("sraid.txt", sep="\s+", dtype=str).set_index("sample", drop=False)  # enforce str in index
 SAMPLE_LIST = SAMPLE_FILE["sample"].values.tolist()
+
 REPLICATE_LIST=["1", "2"]
+
+TREATMENT_FILE = pd.read_csv("sraRunsbyExperiment.csv")
+TREATMENT_LIST = list(set(TREATMENT_FILE["Treatment"].values.tolist()))
+TREATMENT_LOOKUP = TREATMENT_FILE.groupby("Treatment")['Run'].apply(list).to_dict()
 
 # Create sample output folders
 os.makedirs("output/counts/", exist_ok=True)
@@ -35,10 +41,11 @@ rule all:
         expand("output/sra/{sample}.sra", sample=SAMPLE_LIST),
         expand("output/{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/raw/{sample}_{replicate}_fastqc.zip", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
-        expand("output/{sample}/trim/{sample}_{replicate}_val_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/trim/{sample}_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST),
-        "output/counts/featureCounts.cnt"
+        expand("output/{treatment}/bam/{treatment}.bam", treatment=TREATMENT_LIST, sample=SAMPLE_LIST),
+        "output/counts/featureCounts.cnt",
+        "output/counts/htseq-count.tsv"
 
 rule fetchSRA:
     output: "output/sra/{sample}.sra"
@@ -84,29 +91,17 @@ rule trim:
         fwd_fastq = "output/{sample}/raw/{sample}_1.fastq.gz",
         rev_fastq = "output/{sample}/raw/{sample}_2.fastq.gz"
     output:
-        "output/{sample}/trim/{sample}_1_val_1.fq.gz",
-        "output/{sample}/trim/{sample}_2_val_2.fq.gz"
+        "output/{sample}/trim/{sample}_1.fq.gz",
+        "output/{sample}/trim/{sample}_2.fq.gz"
     message: "-----Trimming {wildcards.sample}-----"
     log: "output/{sample}/logs/{sample}_trim.log"
     threads: config["threads"]["trim"]
     run:
         shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 5 \
-             --cores 2 --max_n 40 --gzip -o output/{wildcards.sample}/trim {input.fwd_fastq} {input.rev_fastq} \
+             --cores {threads} --max_n 40 --gzip -o output/{wildcards.sample}/trim {input.fwd_fastq} {input.rev_fastq} \
              2> {log}")
-
-rule fastqc_trim:
-    input:
-        "output/{sample}/trim/{sample}_1_val_1.fq.gz",
-        "output/{sample}/trim/{sample}_2_val_2.fq.gz"
-    output:
-        "output/{sample}/trim/{sample}_1.fq.gz",
-        "output/{sample}/trim/{sample}_2.fq.gz"
-    message: "-----Running Fastqc_trim {wildcards.sample}-----"
-    threads: config["threads"]["fastqc_trim"]
-    log: "output/{sample}/logs/{sample}_trim_fastqc.log"
-    run:
         shell("for file in output/{wildcards.sample}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
-        shell("fastqc --threads {threads} {output} 2> {log}")
+        shell("fastqc --threads {threads} {output}")
 
 rule align:
     input:
@@ -128,12 +123,48 @@ rule align:
         shell("set +e")
         shell("if ! samtools quickcheck {output}; then echo 'samtools quickcheck found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
-rule featureCounts:
-    message: "-----Generating feature counts-----"
+rule merge:
     input: expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST)
+    output: "output/{treatment}/bam/{treatment}.bam"
+    message: "-----Merging bam files by experiment-----"
+    log: "output/{treatment}/bam/{treatment}_merge.log"
+    threads: config["threads"]["merge"]
+    run:
+        shell("sambamba merge --nthreads {threads} {output} " + 
+               " ".join(expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=TREATMENT_LOOKUP[wildcards.treatment])))
+        # Create bam index folder for HTseq
+        shell("samtools index {output}")
+
+rule featureCounts:
+    message: "-----Generating raw counts (featureCounts)-----"
+    input: expand("output/{treatment}/bam/{treatment}.bam", treatment=TREATMENT_LIST)
     output: "output/counts/featureCounts.cnt"
     log: "output/counts/featureCounts.log"
     threads: config["threads"]["featureCount"]
     run:
         shell("featureCounts -o output/counts/featureCounts.cnt  -T {threads} -p -a " + config_dict["GTFname"] + " {input} \
     		2> {log}")
+
+rule HTseq:
+    message: "-----Generating raw counts (HTseq)-----"
+    input:expand("output/{treatment}/bam/{treatment}.bam", treatment=TREATMENT_LIST)
+    output: "output/counts/htseq-count.tsv"
+    log: "output/counts/HTseq.log"
+    threads: config["threads"]["HTseq"]
+    run:
+        # Compute raw gene-wise counts
+        shell("htseq-count \
+                 --format bam \
+                 --order pos \
+                 --mode union \
+                 --nprocesses {threads} \
+                 --add-chromosome-info \
+                 --additional-attr start \
+                 --additional-attr end \
+                 --counts_output {output} \
+                 {input} " + config_dict["GTFname"] + "  \
+                 2> {log}")
+        # Add headers to label HTseq tsv output fields
+        shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' output/counts/htseq-count.tsv &&\
+               sed -i s/'output\/[A-Za-z0-9_]*\/bam\/'//g output/counts/htseq-count.tsv")
+
