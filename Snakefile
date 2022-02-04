@@ -39,7 +39,7 @@ configfile: "config.json"
 rule all:
     input:
         expand("output/sra/{sample}.sra", sample=SAMPLE_LIST),
-        expand("output/{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
+        expand("output//{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/raw/{sample}_{replicate}_fastqc.zip", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/trim/{sample}_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST),
@@ -124,7 +124,7 @@ rule align:
         shell("if ! samtools quickcheck {output}; then echo 'samtools quickcheck found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule merge:
-    input: expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST)
+    input: expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=TREATMENT_LOOKUP[wildcards.treatment])
     output: "output/{treatment}/bam/{treatment}.bam"
     message: "-----Merging bam files by experiment-----"
     log: "output/{treatment}/bam/{treatment}_merge.log"
