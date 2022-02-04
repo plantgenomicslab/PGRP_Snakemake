@@ -39,7 +39,7 @@ configfile: "config.json"
 rule all:
     input:
         expand("output/sra/{sample}.sra", sample=SAMPLE_LIST),
-        expand("output//{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
+        expand("output/{sample}/raw/{sample}_{replicate}.fastq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/raw/{sample}_{replicate}_fastqc.zip", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/trim/{sample}_{replicate}.fq.gz", sample=SAMPLE_LIST, replicate=REPLICATE_LIST),
         expand("output/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=SAMPLE_LIST),
