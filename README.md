@@ -40,7 +40,7 @@ vdb-config -s /http/timeout/read=100000
 snakemake -np
 
 # Visualize the pipeline as a DAG
-snakemake --dag | dot -Tsvg > dag.svg
+snakemake --dag | dot -Tpdf -Gnodesep=0 -Granksep=4 > dag.pdf
 
 # Run the pipeline 
 snakemake --cores [available cores]
