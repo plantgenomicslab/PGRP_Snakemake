@@ -40,20 +40,17 @@ vdb-config -s /http/timeout/read=100000
 snakemake -np
 
 # Visualize the pipeline as a DAG
-snakemake --dag | dot -Tpdf -Gnodesep=0 -Granksep=4 > dag.pdf
+snakemake --dag [output] | dot -Tpdf -Gnodesep=0.75 -Granksep=0.75 > dag.pdf
 
 # Run the pipeline 
 snakemake --cores [available cores]
 ```
 
 ## Running pipeline with SLURM scheduler
-***PLACE HOLDER***
+
 ```bash
 sbatch --mem=16g -c 4 --time=13-11:00:00 -o snakemake.out -e snakemake.err --wrap="./run.sh"
 ```
 
 ## Citations
 
-###tximport
-
-Soneson C, Love MI, Robinson MD (2015). “Differential analyses for RNA-seq: transcript-level estimates improve gene-level inferences.” F1000Research, 4. doi: 10.12688/f1000research.7563.1.
