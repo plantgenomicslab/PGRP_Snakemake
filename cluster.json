@@ -45,5 +45,13 @@
 "HTseq":{
         "ncpus": 16,
         "memory": "64g"
-        }
+        },
+"normalizeFeatureCounts":{
+        "ncpus":2,
+        "memory":"8g"
+        },
+"normalizeHTseq":{
+       "ncpus":2,
+       "memory":"8g"
+       }
 }

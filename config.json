@@ -6,7 +6,9 @@
     "align": 16,
     "merge": 16,
     "featureCount":16,
-    "HTseq":16
+    "HTseq":16,
+    "normalizeFeatureCounts":2,
+    "normalizeHTseq":2
   },
   "genomeDir":"ref/",
   "GTFname":"ref/Athaliana_167_gene.gtf",

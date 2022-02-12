@@ -38,7 +38,11 @@ configfile: "config.json"
 
 def allInput():
     inputs = ["output/counts/featureCounts.cnt",
-              "output/counts/htseq-count.tsv"]
+              "output/counts/htseq-count.tsv",
+              "output/counts/featureCounts.tpm.tsv",
+              "output/counts/featureCounts.fpkm.tsv",
+              "output/counts/htseq-count.tpm.tsv",
+              "output/counts/htseq-count.fpkm.tsv"]
     for treatment in TREATMENT_LIST:
         inputs.append("output/" + treatment + "/bam/" + treatment + ".bam")
         for sample in TREATMENT_LOOKUP[treatment]:
@@ -122,7 +126,7 @@ rule align:
                 --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 10000 \
 		--genomeDir " + config["genomeDir"]  + " \
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
-                --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{treatment}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
+                --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.treatment}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
 		2> {log}")
         # Perform quick check on output bam file to ensure it is not corrupted
         shell("echo '--------Checking {output}----------'")
@@ -172,7 +176,7 @@ rule HTseq:
                  2> {log}")
         # Add headers to label HTseq tsv output fields
         shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' output/counts/htseq-count.tsv &&\
-               sed -i s/'output\/[A-Za-z0-9_]*\/bam\/'//g output/counts/htseq-count.tsv")
+               sed -i s/'output\/[A-Za-z0-9_-]*\/bam\/'//g output/counts/htseq-count.tsv")
 
 rule normalizeFeatureCounts:
     input:
@@ -185,9 +189,9 @@ rule normalizeFeatureCounts:
     threads: config["threads"]["normalizeFeatureCounts"]
     run:
         shell("cat {input} |  egrep -v '#' | \
-               sed 's/\Aligned\.sortedByCoord\.out\.bam//g; s/\.bam//g' \
+               sed 's/\Aligned\.sortedByCoord\.out\.bam//g; s/\.bam//g; s/output\/[A-Za-z0-9_-]*\/bam\///g' \
                > output/counts/featureCount_clean.cnt")
-        shell("./normalizeCounts.py featureCounts " + config["GTFname"] + " output/counts/featureCount_clean.cnt output/counts/featureCounts")
+        shell("python normalizeCounts.py featureCounts " + config["GTFname"] + " output/counts/featureCount_clean.cnt output/counts/featureCounts")
 
 rule normalizeHTseq:
     input:
@@ -199,5 +203,5 @@ rule normalizeHTseq:
     log: "output/counts/normalize_HTseq.log"
     threads: config["threads"]["normalizeHTseq"]
     run:
-        shell("sed {input} 's/\.bam//g' > output/counts/htseq-count_clean.cnt")
-        shell("./normalizeCounts.py HTseq " + config["GTFname"] + " output/counts/htseq-count_clean.cnt output/counts/htseq-count")
+        shell("sed 's/\.bam//g' {input} > output/counts/htseq-count_clean.cnt")
+        shell("python normalizeCounts.py HTseq " + config["GTFname"] + " output/counts/htseq-count_clean.cnt output/counts/htseq-count")
