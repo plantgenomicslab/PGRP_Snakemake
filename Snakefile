@@ -11,6 +11,8 @@ TREATMENT_FILE = pd.read_csv("sraRunsbyExperiment.csv")
 TREATMENT_LIST = list(set(TREATMENT_FILE["Treatment"].values.tolist()))
 TREATMENT_LOOKUP = TREATMENT_FILE.groupby("Treatment")['Run'].apply(list).to_dict()
 
+CONTRASTS = pd.read_csv("contrasts.txt", sep="\t", header=None)
+
 # Create sample output folders
 os.makedirs("output/counts/", exist_ok=True)
 os.makedirs("output/sra/", exist_ok=True)
@@ -37,7 +39,8 @@ for ref in config_dict["ref"]:
 configfile: "config.json"
 
 def allInput():
-    inputs = ["output/counts/featureCounts.cnt",
+    inputs = ["output/counts/tpm-calculator.tpm",
+              "output/counts/featureCounts.cnt",
               "output/counts/htseq-count.tsv",
               "output/counts/featureCounts.tpm.tsv",
               "output/counts/featureCounts.fpkm.tsv",
@@ -148,6 +151,15 @@ rule merge:
         # Create bam index folder for HTseq
         shell("samtools index {output}")
 
+rule TPMCalculator:
+    input: expand("output/{treatment}/bam/{treatment}.bam", treatment=TREATMENT_LIST)
+    output: "output/counts/tpm-calculator.tpm"
+    message: "------- Calculating TPM --------"
+    log: "output/counts/tpm-calculator.log"
+    threads: config["threads"]["TPMCalculator"]
+    run:
+        shell("TPMCalculator -g " + config_dict["GTFname"] + " -b {input}")
+
 rule featureCounts:
     message: "-----Generating raw counts (featureCounts)-----"
     input: expand("output/{treatment}/bam/{treatment}.bam", treatment=TREATMENT_LIST)
@@ -205,3 +217,12 @@ rule normalizeHTseq:
     run:
         shell("sed 's/\.bam//g' {input} > output/counts/htseq-count_clean.cnt")
         shell("python normalizeCounts.py HTseq " + config["GTFname"] + " output/counts/htseq-count_clean.cnt output/counts/htseq-count")
+
+rule DEG:
+    input: "output/counts/featureCount_clean.cnt"
+    output: "output/DEG/featureCount_clean.cnt." + CONTRASTS.iloc[1][0]  + "_vs_" + CONTRASTS.iloc[1][1]  + ".DEseq2.DE_results"
+    message: "-------Calculating DEGs---------"
+    log: "output/DEG/DEG.log"
+    threads: config["threads"]["DEG"]
+    run:
+        shell("run_DE_analysis.pl --matrix {input} --method DESeq2 --samples_file contrasts.txt --output output/DEG")

@@ -53,5 +53,9 @@
 "normalizeHTseq":{
        "ncpus":2,
        "memory":"8g"
+       },
+"TPMCalculator":{
+       "ncpus": 16,
+       "memory": "64g"
        }
 }
