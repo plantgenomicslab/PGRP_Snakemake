@@ -92,10 +92,16 @@ contrasts.txt provides tab separated contrasts to be used in differential gene e
 ```bash
 # Example format of contrasts.txt
 
- head contrasts.txt
-ZT0	ZT4
-ZT0	ZT8
-ZT4	ZT8
+cat contrasts.txt
+ZT0	ZT0_rep1
+ZT0	ZT0_rep2
+ZT0	ZT0_rep3
+ZT4	ZT4_rep1
+ZT4	ZT4_rep2
+ZT4	ZT4_rep3
+ZT8	ZT8_rep1
+ZT8	ZT8_rep2
+ZT8	ZT8_rep3
 ```
 
 ### Running without scheduler
