@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-# usage: joinSraRelations.py [SRA Project Id]
+# usage: joinSraRelations.py [SRA Project Id] [replicate regex] [treatment regex]
+# example: ./joinSraRelations.py SRP098160 "ZT\d{1,2}_rep\d" "ZT\d{1,2}"
 # This script will download Run and Experiment level metadata from NCBI's SRA
-# database and join the information into a single tabele (csv) relating run
-# ids (SRR...) to experiment ids (SRX....). 
+# database and join the information into a single tabele (tsv) relating run
+# ids (SRR...) to experiment ids (SRX....). For each treatment/replicate a human 
+# readable title is parsed out if the run titles using user input reges expressions.
 
 import pandas as pd
 import os
@@ -18,11 +20,10 @@ experiments = pd.read_xml("sraExperimentSummary.xml", xpath="//EXPERIMENT_PACKAG
 runs = runs[["Run","Experiment"]]
 
 experiments = experiments[["accession", "TITLE"]]
-experiments = experiments.rename(columns={"accession":"Experiment", "TITLE":"Treatment"})
-experiments[['alias','Treatment', 'Genus', 'Species', 'Type']] = experiments['Treatment'].astype("string").str.split(' ',expand=True)
-experiments = experiments[['Experiment', 'Treatment']]
-experiments['Treatment'] = experiments['Treatment'].str.replace(r';', '')
+experiments = experiments.rename(columns={"accession":"Experiment", "TITLE":"Replicate"})
+experiments['Replicate'] = experiments['Replicate'].str.extract(r'(' + sys.argv[2] + ')')
+experiments['Treatment'] = experiments['Replicate'].str.extract(r'(' +sys.argv[3] + ')')
 
 joined = pd.merge(runs, experiments, on="Experiment")
 
-joined.to_csv("sraRunsbyExperiment.csv", index=False)
+joined.to_csv("sraRunsbyExperiment.tsv", sep="\t", index=False)
