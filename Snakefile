@@ -2,7 +2,7 @@ import sys
 import os
 import pandas as pd
 
-SAMPLES_FILE = pd.read_csv("sraRunsbyExperiment.tsv")
+SAMPLES_FILE = pd.read_csv("sraRunsbyExperiment.tsv", sep="\t")
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
@@ -16,6 +16,7 @@ os.makedirs("output/counts/", exist_ok=True)
 os.makedirs("output/sra/", exist_ok=True)
 os.makedirs("output/sra/logs/", exist_ok=True)
 os.makedirs("output/logs/", exist_ok=True)
+os.makedirs("output/DEG/", exist_ok=True)
 
 for path in SAMPLE_LIST:
     os.makedirs("output/" + path + "/raw/", exist_ok=True)
@@ -151,7 +152,7 @@ rule merge:
         shell("samtools index {output}")
 
 rule TPMCalculator:
-    input: expand("output/{replicate}/bam/{treatment}.bam", replicate=REPLICATE_LIST)
+    input: expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
     output: "output/counts/tpm-calculator.tpm"
     message: "------- Calculating TPM --------"
     log: "output/counts/tpm-calculator.log"
@@ -161,7 +162,7 @@ rule TPMCalculator:
 
 rule featureCounts:
     message: "-----Generating raw counts (featureCounts)-----"
-    input: expand("output/{replicate}/bam/{treatment}.bam", replicate=REPLICATE_LIST)
+    input: expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
     output: "output/counts/featureCounts.cnt"
     log: "output/counts/featureCounts.log"
     threads: config["threads"]["featureCount"]
@@ -171,7 +172,7 @@ rule featureCounts:
 
 rule HTseq:
     message: "-----Generating raw counts (HTseq)-----"
-    input:expand("output/{replicate}/bam/{treatment}.bam", replicate=REPLICATE_LIST)
+    input:expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
     output: "output/counts/htseq-count.tsv"
     log: "output/counts/HTseq.log"
     threads: config["threads"]["HTseq"]

@@ -57,5 +57,9 @@
 "TPMCalculator":{
        "ncpus": 16,
        "memory": "64g"
+       },
+"DEG":{
+       "ncpus": 16,
+       "memory": "64g"
        }
 }
