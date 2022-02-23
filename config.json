@@ -9,8 +9,9 @@
     "HTseq":16,
     "normalizeFeatureCounts":2,
     "normalizeHTseq":2,
-    "TPMCalculator":16,
-    "DEG":16
+    "TPMCalculator":8,
+    "DEG":8,
+    "summarize":2
   },
   "genomeDir":"ref/",
   "GTFname":"ref/Gmax_508_Wm82.a4.v1.gene.gtf",

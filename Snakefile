@@ -17,8 +17,11 @@ os.makedirs("output/sra/", exist_ok=True)
 os.makedirs("output/sra/logs/", exist_ok=True)
 os.makedirs("output/logs/", exist_ok=True)
 os.makedirs("output/DEG/", exist_ok=True)
+os.makedirs("output/counts/featureCounts/", exist_ok=True)
+os.makedirs("output/counts/htseq/", exist_ok=True)
+os.makedirs("output/counts/tpmcalculator", exist_ok=True)
 
-for path in SAMPLE_LIST:
+for path in REPLICATE_LIST:
     os.makedirs("output/" + path + "/raw/", exist_ok=True)
     os.makedirs("output/" + path + "/bam/", exist_ok=True)
     os.makedirs("output/" + path + "/logs/", exist_ok=True)
@@ -38,14 +41,16 @@ for ref in config_dict["ref"]:
 configfile: "config.json"
 
 def allInput():
-    inputs = ["output/counts/tpm-calculator.tpm",
-              "output/counts/featureCounts.cnt",
-              "output/counts/htseq-count.tsv",
-              "output/counts/featureCounts.tpm.tsv",
-              "output/counts/featureCounts.fpkm.tsv",
-              "output/counts/htseq-count.tpm.tsv",
-              "output/counts/htseq-count.fpkm.tsv",
-              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[1][1]  + ".DEseq2.DE_results"]
+    inputs = ["output/counts/tpmcalculator/tpm-calculator.tpm",
+              "output/counts/featureCounts/featureCounts.cnt",
+              "output/counts/htseq/htseq-count.tsv",
+              "output/counts/featureCounts/featureCounts.tpm.tsv",
+              "output/counts/featureCounts/featureCounts.fpkm.tsv",
+              "output/counts/htseq/htseq-count.tpm.tsv",
+              "output/counts/htseq/htseq-count.fpkm.tsv",
+              "output/counts/tpmcalculator/tpm-calculator.tpm.mean.tsv",
+              "output/counts/featureCounts/featureCount_clean.cnt",
+              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"]
     for replicate in REPLICATE_LIST:
         inputs.append("output/" + replicate + "/bam/" + replicate + ".bam")
         for sample in REPLICATE_LOOKUP[replicate]:
@@ -126,7 +131,7 @@ rule align:
     threads: config["threads"]["align"]
     run:
         shell("STAR --runMode alignReads --runThreadN {threads} \
-                --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 10000 \
+                --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
 		--genomeDir " + config["genomeDir"]  + " \
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
                 --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
@@ -153,76 +158,93 @@ rule merge:
 
 rule TPMCalculator:
     input: expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
-    output: "output/counts/tpm-calculator.tpm"
+    output: "output/counts/tpmcalculator/tpm-calculator.tpm"
     message: "------- Calculating TPM --------"
-    log: "output/counts/tpm-calculator.log"
+    log: "output/counts/tpmcalculator/tpm-calculator.log"
     threads: config["threads"]["TPMCalculator"]
     run:
-        shell("TPMCalculator -g " + config_dict["GTFname"] + " -b {input}")
+        shell("TPMCalculator \
+               --mode intersection-strict \
+               --type exon \
+               --idattr gene_id \
+               -g " + config_dict["GTFname"] + " " +" ".join(expand("-b output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)))
 
 rule featureCounts:
     message: "-----Generating raw counts (featureCounts)-----"
     input: expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
-    output: "output/counts/featureCounts.cnt"
-    log: "output/counts/featureCounts.log"
+    output: 
+        raw = "output/counts/featureCounts/featureCounts.cnt",
+        cleaned = "output/counts/featureCounts/featureCount_clean.cnt"
+    log: "output/counts/featureCounts/featureCounts.log"
     threads: config["threads"]["featureCount"]
     run:
-        shell("featureCounts -o output/counts/featureCounts.cnt  -T {threads} -p -a " + config_dict["GTFname"] + " {input} \
+        shell("featureCounts -o {output.raw}  -T {threads} -p -a " + config_dict["GTFname"] + " {input} \
     		2> {log}")
+        shell("cat {input} |  egrep -v '#' | \
+                sed 's/\Aligned\.sortedByCoord\.out\.bam//g; s/\.bam//g; s/output\/[A-Za-z0-9_-]*\/bam\///g' \
+                > {output.cleaned}")
 
 rule HTseq:
     message: "-----Generating raw counts (HTseq)-----"
     input:expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
-    output: "output/counts/htseq-count.tsv"
-    log: "output/counts/HTseq.log"
+    output: "output/counts/htseq/htseq-count.tsv"
+    log: "output/counts/htseq/HTseq.log"
     threads: config["threads"]["HTseq"]
     run:
         # Compute raw gene-wise counts
         shell("htseq-count \
                  --format bam \
                  --order pos \
-                 --mode union \
+                 --mode intersection-strict \
+                 --type exon \
+                 --idattr gene_id \
                  --nprocesses {threads} \
                  --counts_output {output} \
                  {input} " + config_dict["GTFname"] + "  \
                  2> {log}")
         # Add headers to label HTseq tsv output fields
-        shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' output/counts/htseq-count.tsv &&\
-               sed -i s/'output\/[A-Za-z0-9_-]*\/bam\/'//g output/counts/htseq-count.tsv")
+        shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' {output} &&\
+               sed -i s/'output\/[A-Za-z0-9_-]*\/bam\/'//g {output}")
 
 rule normalizeFeatureCounts:
     input:
-        "output/counts/featureCounts.cnt"
+        "output/counts/featureCounts/featureCount_clean.cnt"
     output:
-        "output/counts/featureCounts.tpm.tsv",
-        "output/counts/featureCounts.fpkm.tsv"
+        "output/counts/featureCounts/featureCounts.tpm.tsv",
+        "output/counts/featureCounts/featureCounts.fpkm.tsv"
     message: "------- Normalizing featureCounts ---------"
     log: "output/counts/normalize_featureCounts.log"
     threads: config["threads"]["normalizeFeatureCounts"]
     run:
-        shell("cat {input} |  egrep -v '#' | \
-               sed 's/\Aligned\.sortedByCoord\.out\.bam//g; s/\.bam//g; s/output\/[A-Za-z0-9_-]*\/bam\///g' \
-               > output/counts/featureCount_clean.cnt")
-        shell("python normalizeCounts.py featureCounts " + config["GTFname"] + " output/counts/featureCount_clean.cnt output/counts/featureCounts")
+        shell("python normalizeCounts.py featureCounts " + config["GTFname"] + " {input} output/counts/featureCounts/featureCounts")
 
 rule normalizeHTseq:
     input:
-        "output/counts/htseq-count.tsv"
+        "output/counts/htseq/htseq-count.tsv"
     output:
-        "output/counts/htseq-count.tpm.tsv",
-        "output/counts/htseq-count.fpkm.tsv"
+        tpm = "output/counts/htseq/htseq-count.tpm.tsv",
+        fpkm = "output/counts/htseq/htseq-count.fpkm.tsv",
+        cleaned = "output/counts/htseq/htseq-count_clean.cnt"
     message: "------- Normalizing HTseq ---------"
-    log: "output/counts/normalize_HTseq.log"
+    log: "output/counts/htseq/normalize_HTseq.log"
     threads: config["threads"]["normalizeHTseq"]
     run:
-        shell("sed 's/\.bam//g' {input} > output/counts/htseq-count_clean.cnt")
-        shell("python normalizeCounts.py HTseq " + config["GTFname"] + " output/counts/htseq-count_clean.cnt output/counts/htseq-count")
+        shell("sed 's/\.bam//g' {input} > {output.cleaned}")
+        shell("python normalizeCounts.py HTseq " + config["GTFname"] + " {output.cleaned} output/counts/htseq/htseq-count")
 
 rule DEG:
-    input: "output/counts/featureCount_clean.cnt"
-    output: "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[1][1]  + ".DEseq2.DE_results"
-    message: "-------Calculating DEGs---------"
+    input: "output/counts/featureCounts/featureCount_clean.cnt"
+    output: "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
+    message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG.log"
     threads: config["threads"]["DEG"]
     run:
         shell("run_DE_analysis.pl --matrix {input} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+
+rule summarize:
+    input: "output/counts/tpmcalculator/tpm-calculator.tpm"
+    output: "output/counts/tpmcalculator/tpm-calculator.tpm.mean.tsv"
+    message: "--------------Summarizing Normalized Counts--------------"
+    threads: config["threads"]["summarize"]
+    run:
+        shell("./summarizeNormalizedCounts.py {input}")

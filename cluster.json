@@ -55,11 +55,15 @@
        "memory":"8g"
        },
 "TPMCalculator":{
-       "ncpus": 16,
+       "ncpus": 8,
        "memory": "64g"
        },
 "DEG":{
-       "ncpus": 16,
+       "ncpus": 8,
        "memory": "64g"
+       },
+"summarize":{
+       "ncpus":2,
+       "memory":"8g"
        }
 }
