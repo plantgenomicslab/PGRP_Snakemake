@@ -10,7 +10,9 @@
     "normalizeFeatureCounts":2,
     "normalizeHTseq":2,
     "TPMCalculator":8,
-    "DEG":8,
+    "mergeTPMCalculator": 2,
+    "DEG_featureCounts":8,
+    "DEG_HTseq":8,
     "summarize":2
   },
   "genomeDir":"ref/",

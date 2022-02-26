@@ -58,7 +58,15 @@
        "ncpus": 8,
        "memory": "64g"
        },
-"DEG":{
+"mergeTPMCalculator":{
+       "ncpus":2,
+       "memory":"8g"
+       },
+"DEG_featureCounts":{
+       "ncpus": 8,
+       "memory": "64g"
+       },
+"DEG_HTseq":{
        "ncpus": 8,
        "memory": "64g"
        },

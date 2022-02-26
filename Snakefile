@@ -2,6 +2,7 @@ import sys
 import os
 import pandas as pd
 
+# Load run and sample information from the sraRunsbyExperiment.tsv input file (user must provide)
 SAMPLES_FILE = pd.read_csv("sraRunsbyExperiment.tsv", sep="\t")
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
@@ -9,6 +10,7 @@ REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict(
 
 PAIR_LIST=["1", "2"]
 
+# Load contrasts.txt for DEG calculation (user must provide)
 CONTRASTS_FILE = pd.read_csv("contrasts.txt", sep="\t", header=None)
 
 # Create sample output folders
@@ -40,19 +42,24 @@ for ref in config_dict["ref"]:
 
 configfile: "config.json"
 
+# Generate a list of all target output files
 def allInput():
-    inputs = ["output/counts/tpmcalculator/tpm-calculator.tpm",
-              "output/counts/featureCounts/featureCounts.cnt",
+    inputs = ["output/counts/featureCounts/featureCounts.cnt",
               "output/counts/htseq/htseq-count.tsv",
               "output/counts/featureCounts/featureCounts.tpm.tsv",
               "output/counts/featureCounts/featureCounts.fpkm.tsv",
               "output/counts/htseq/htseq-count.tpm.tsv",
               "output/counts/htseq/htseq-count.fpkm.tsv",
-              "output/counts/tpmcalculator/tpm-calculator.tpm.mean.tsv",
+              "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
+              "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv",
+              "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
+              "output/counts/htseq/htseq-count.tpm.tsv.average.tsv",
               "output/counts/featureCounts/featureCount_clean.cnt",
-              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"]
+              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results",
+              "output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"]
     for replicate in REPLICATE_LIST:
         inputs.append("output/" + replicate + "/bam/" + replicate + ".bam")
+        inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
         for sample in REPLICATE_LOOKUP[replicate]:
             inputs.append("output/" + replicate + "/" + sample + "/bam/" + sample + ".bamAligned.sortedByCoord.out.bam")
             for pair in PAIR_LIST:
@@ -71,6 +78,7 @@ rule fetchSRA:
     threads: config["threads"]["fetchSRA"]
     log: "output/sra/logs/{sample}_downloadSRA.log"
     run:
+        # Download SRA files from NCBI SRA
         shell("prefetch {wildcards.sample} --output-file {output} 2> {log}")
         # Check sra files to make sure they are valid
         shell("echo '--------Validating {wildcards.sample}.sra--------'")
@@ -86,6 +94,7 @@ rule convertSRAtoFastq:
     threads: config["threads"]["convertSRAtoFastq"]
     log: "output/{replicate}/{sample}/logs/{sample}_fastqdump.log"
     run:
+        # Convert sra files to fastQ format
         shell("parallel-fastq-dump --sra-id {wildcards.sample} \
 				--threads {threads} --split-e --gzip \
 				--outdir output/{wildcards.replicate}/{wildcards.sample}/raw \
@@ -102,6 +111,7 @@ rule fastqc_raw:
     threads: config["threads"]["fastqc_raw"]
     log: "output/{replicate}/{sample}/logs/{sample}_raw_fastqc.log"
     run:
+        # Run quality control on raw reads
         shell("fastqc --threads {threads} {input} 2> {log}")
 
 rule trim:
@@ -115,10 +125,13 @@ rule trim:
     log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
     threads: config["threads"]["trim"]
     run:
+        # Trim reads using TrimGalore
         shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 5 \
              --cores {threads} --max_n 40 --gzip -o output/{wildcards.replicate}/{wildcards.sample}/trim {input.fwd_fastq} {input.rev_fastq} \
              2> {log}")
+        # Update filenames to improve MultiQC output format
         shell("for file in output/{wildcards.replicate}/{wildcards.sample}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
+        # Run quality control on trimmed reads
         shell("fastqc --threads {threads} {output}")
 
 rule align:
@@ -130,16 +143,17 @@ rule align:
     log: "output/{replicate}/{sample}/logs/{sample}_align.log"
     threads: config["threads"]["align"]
     run:
+        # Calculate run-level alignments to reference
         shell("STAR --runMode alignReads --runThreadN {threads} \
                 --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
 		--genomeDir " + config["genomeDir"]  + " \
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
                 --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
 		2> {log}")
-        # Perform quick check on output bam file to ensure it is not corrupted
+        # Perform check on output bam file to ensure it is not corrupted
         shell("echo '--------Checking {output}----------'")
         shell("set +e")
-        shell("if ! samtools quickcheck {output}; then echo 'samtools quickcheck found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
+        shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 def mergeInput(wildcards):
     inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
@@ -147,27 +161,47 @@ def mergeInput(wildcards):
 
 rule merge:
     input: mergeInput
-    output: "output/{replicate}/bam/{treatment}.bam"
+    output: "output/{replicate}/bam/{replicate}.bam"
     message: "-----Merging bam files by experiment-----"
-    log: "output/{replicate}/bam/{treatment}_merge.log"
+    log: "output/{replicate}/bam/{replicate}_merge.log"
     threads: config["threads"]["merge"]
     run:
-        shell("sambamba merge --nthreads {threads} {output} {input}")
-        # Create bam index folder for HTseq
-        shell("samtools index {output}")
+        # note: bam files must be sorted in same manner prior to merge
+        if len(REPLICATE_LOOKUP[wildcards.replicate]) > 1:
+            # Merge bam files from same sample
+            shell("samtools merge --threads {threads} -o {output} {input}") 
+            # Create bam index folder for HTseq
+            shell("samtools index {output}") 
+        else:
+            # Only 1 run in a sample, add it to sample-level output
+            shell("cp {input} {output}")
+        # Perform check on output bam file to ensure it is not corrupted
+        shell("echo '--------Checking {output}----------'")
+        shell("set +e")
+        shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule TPMCalculator:
-    input: expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
-    output: "output/counts/tpmcalculator/tpm-calculator.tpm"
+    input: "output/{replicate}/bam/{replicate}.bam"
+    output: "output/counts/tpmcalculator/{replicate}_genes.out"
     message: "------- Calculating TPM --------"
-    log: "output/counts/tpmcalculator/tpm-calculator.log"
+    #log: "output/counts/tpmcalculator/tpm-calculator.log"
     threads: config["threads"]["TPMCalculator"]
     run:
+        # Perform TPM calculation using each sample-level bam file
         shell("TPMCalculator \
-               --mode intersection-strict \
-               --type exon \
-               --idattr gene_id \
-               -g " + config_dict["GTFname"] + " " +" ".join(expand("-b output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)))
+               -k gene_id \
+               -t transcript_id \
+               -g " + config_dict["GTFname"] + " -b {input}")
+        # Move output files to proper location
+        shell("mv {wildcards.replicate}_genes.* output/counts/tpmcalculator/")
+
+rule mergeTPMCalculator:
+    input: expand("output/counts/tpmcalculator/{replicate}_genes.out", replicate=REPLICATE_LIST)
+    output: "output/counts/tpmcalculator/tpmcalculator-merged.tsv"
+    message: "--------Merging TPMCalculator results--------"
+    threads: config["threads"]["mergeTPMCalculator"]
+    run:
+        shell("./mergeTPMCalculator.py {input}")
 
 rule featureCounts:
     message: "-----Generating raw counts (featureCounts)-----"
@@ -178,9 +212,17 @@ rule featureCounts:
     log: "output/counts/featureCounts/featureCounts.log"
     threads: config["threads"]["featureCount"]
     run:
-        shell("featureCounts -o {output.raw}  -T {threads} -p -a " + config_dict["GTFname"] + " {input} \
+        # Calculate raw counts from all sample-level bam files
+        shell("featureCounts \
+                -o {output.raw} \
+                -T {threads} \
+                -Q 10 \
+                -p -M \
+                -g gene_id \
+                -a " + config_dict["GTFname"] + " {input} \
     		2> {log}")
-        shell("cat {input} |  egrep -v '#' | \
+        # Remove the featureCounts header line from output file and re-format the output names
+        shell("cat {output.raw} |  egrep -v '#' | \
                 sed 's/\Aligned\.sortedByCoord\.out\.bam//g; s/\.bam//g; s/output\/[A-Za-z0-9_-]*\/bam\///g' \
                 > {output.cleaned}")
 
@@ -201,10 +243,12 @@ rule HTseq:
                  --nprocesses {threads} \
                  --counts_output {output} \
                  {input} " + config_dict["GTFname"] + "  \
-                 2> {log}")
+                 &> {log}")
         # Add headers to label HTseq tsv output fields
         shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' {output} &&\
                sed -i s/'output\/[A-Za-z0-9_-]*\/bam\/'//g {output}")
+        # Re-format treatment names in HTseq output
+        shell("sed -i 's/\.bam//g' {output}")
 
 rule normalizeFeatureCounts:
     input:
@@ -216,6 +260,7 @@ rule normalizeFeatureCounts:
     log: "output/counts/normalize_featureCounts.log"
     threads: config["threads"]["normalizeFeatureCounts"]
     run:
+        # Compute TPM and FPKM values featureCounts raw counts
         shell("python normalizeCounts.py featureCounts " + config["GTFname"] + " {input} output/counts/featureCounts/featureCounts")
 
 rule normalizeHTseq:
@@ -223,28 +268,57 @@ rule normalizeHTseq:
         "output/counts/htseq/htseq-count.tsv"
     output:
         tpm = "output/counts/htseq/htseq-count.tpm.tsv",
-        fpkm = "output/counts/htseq/htseq-count.fpkm.tsv",
-        cleaned = "output/counts/htseq/htseq-count_clean.cnt"
+        fpkm = "output/counts/htseq/htseq-count.fpkm.tsv"
     message: "------- Normalizing HTseq ---------"
     log: "output/counts/htseq/normalize_HTseq.log"
     threads: config["threads"]["normalizeHTseq"]
     run:
-        shell("sed 's/\.bam//g' {input} > {output.cleaned}")
-        shell("python normalizeCounts.py HTseq " + config["GTFname"] + " {output.cleaned} output/counts/htseq/htseq-count")
+        # Compute TPM and FPKM values HTseq raw counts
+        shell("python normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count")
 
-rule DEG:
-    input: "output/counts/featureCounts/featureCount_clean.cnt"
-    output: "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
+rule DEG_featureCounts:
+    input: 
+        featureCounts = "output/counts/featureCounts/featureCount_clean.cnt"
+    output: 
+        featureCounts = "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
     message: "-------Calculating DEGs {output}---------"
-    log: "output/DEG/DEG.log"
-    threads: config["threads"]["DEG"]
+    log: "output/DEG/DEG_featureCounts.log"
+    threads: config["threads"]["DEG_featureCounts"]
     run:
-        shell("run_DE_analysis.pl --matrix {input} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+        # Compute differentially expressed genes based on contrasts.txt
+        shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+
+rule DEG_HTseq:
+    input:
+        HTseq = "output/counts/htseq/htseq-count.tsv"
+    output:
+        HTseq = "output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
+    message: "-------Calculating DEGs {output}---------"
+    log: "output/DEG/DEG_HTseq.log"
+    threads: config["threads"]["DEG_HTseq"]
+    run:
+        # Compute differentially expressed genes based on contrasts.txt
+        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
 
 rule summarize:
-    input: "output/counts/tpmcalculator/tpm-calculator.tpm"
-    output: "output/counts/tpmcalculator/tpm-calculator.tpm.mean.tsv"
+    input: 
+        tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
+        featureCounts_TPM = "output/counts/featureCounts/featureCounts.tpm.tsv",
+        featureCounts_FPKM = "output/counts/featureCounts/featureCounts.fpkm.tsv",
+        HTseq_TPM = "output/counts/htseq/htseq-count.tpm.tsv",
+        HTseq_FPKM = "output/counts/htseq/htseq-count.fpkm.tsv"
+    output: 
+        "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv",
+        "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
+        "output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
     message: "--------------Summarizing Normalized Counts--------------"
     threads: config["threads"]["summarize"]
     run:
-        shell("./summarizeNormalizedCounts.py {input}")
+        # Compute summary statistics (average/standard deviation) from TPMcalculator TPM values
+        shell("./summarizeNormalizedCounts.py Gene_Id {input.tpmcalc}")
+        # Compute summary statistics (average/standard deviation) from HTseq FPKM/TPM values
+        shell("./summarizeNormalizedCounts.py gene {input.HTseq_TPM}")
+        shell("./summarizeNormalizedCounts.py gene {input.HTseq_FPKM}")
+        # Compute summary statistics (average/standard deviation) from featureCounts FPKM/TPM values
+        shell("./summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
+        shell("./summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")

@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 
 # Usage: ./summarizeNormalizedCounts.py [counts_file]
-# This script takes a counts file (tsv) and computes gene-wise means and
+# This script takes a counts file (tsv) and computes gene-wise averages and
 # standard deviations among replicates. Treatment/replicate relationships
 # are defined by the sraRunsbyExperiment.tsv input file.
 
 import pandas as pd
 import sys
 
-COUNTS_FILE = sys.argv[1]
-counts = pd.read_csv(COUNTS_FILE, sep="\t", index_col="Geneid")
+gene_index = sys.argv[1]
+COUNTS_FILE = sys.argv[2]
+counts = pd.read_csv(COUNTS_FILE, sep="\t", index_col=gene_index)
 
 SAMPLES_FILE = pd.read_csv("sraRunsbyExperiment.tsv", sep="\t")
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Treatment")['Replicate'].unique().apply(list).to_dict()
@@ -24,5 +25,5 @@ for treatment in REPLICATE_LOOKUP:
     averages[treatment] = reps.mean(axis=1)
     stdDevs[treatment] = reps.std(axis=1)
 
-averages.to_csv(COUNTS_FILE + ".mean.tsv", sep="\t", index=True)
+averages.to_csv(COUNTS_FILE + ".average.tsv", sep="\t", index=True)
 stdDevs.to_csv(COUNTS_FILE + ".stdDev.tsv", sep="\t", index=True)

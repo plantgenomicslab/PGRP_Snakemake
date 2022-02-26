@@ -1,6 +1,3 @@
-ZT0	ZT0_rep1
-ZT0	ZT0_rep2
-ZT0	ZT0_rep3
 ZT4	ZT4_rep1
 ZT4	ZT4_rep2
 ZT4	ZT4_rep3
