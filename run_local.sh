@@ -4,7 +4,8 @@ set -x
 set -e
 
 snakemake -p --rerun-incomplete --cluster-config cluster.json \
-		--max-jobs-per-second 50 \
+		--snakefile Snakefile_local \
+                --max-jobs-per-second 50 \
 		--max-status-checks-per-second 50 \
 		--jobs 150 \
 		--latency-wait 30 \
