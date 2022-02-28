@@ -23,11 +23,13 @@ os.makedirs("output/counts/featureCounts/", exist_ok=True)
 os.makedirs("output/counts/htseq/", exist_ok=True)
 os.makedirs("output/counts/tpmcalculator", exist_ok=True)
 
-for path in REPLICATE_LIST:
-    os.makedirs("output/" + path + "/raw/", exist_ok=True)
-    os.makedirs("output/" + path + "/bam/", exist_ok=True)
-    os.makedirs("output/" + path + "/logs/", exist_ok=True)
-    os.makedirs("output/" + path + "/trim/", exist_ok=True)
+for rep in REPLICATE_LIST:
+    os.makedirs("output/" + rep + "/bam/", exist_ok=True)
+    for r in REPLICATE_LOOKUP[rep]:
+        os.makedirs("output/" + rep + "/" + r  + "/raw/", exist_ok=True)
+        os.makedirs("output/" + rep + "/" + r  + "/bam/", exist_ok=True)
+        os.makedirs("output/" + rep + "/" + r  + "/logs/", exist_ok=True)
+        os.makedirs("output/" + rep + "/" + r  + "/trim/", exist_ok=True)
 
 # Load the config file as a dictionary
 cf = open("config.json")
