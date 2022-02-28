@@ -16,17 +16,12 @@ if mode == "HTseq":
     #Load raw counts from HTseq output
     counts = pd.read_csv(input_file, sep="\t", index_col="gene")
     counts = counts[:-5]
-
-    # Compute gene lengths from GTF file
-    # These lengths are not congruent with the featureCounts lengths in some cases, need to revisit this
-    gtf = pd.read_csv(GTF_file, header=None, sep="\t")
-    gtf_exon = gtf.loc[gtf[2] == "exon"]
-    gene_length = gtf_exon[8].str.split(";", expand=True)[1]
-    gene_length = pd.DataFrame(gene_length)
-    gene_length["Length"] = gtf_exon[4] - gtf_exon[3]
+    
+    # Load exon lengths
+    gene_length = pd.read_csv("ref/cds_length.tsv", header=None, sep="\t")
     gene_length.columns = ["Geneid", "Length"]
-    gene_length["Geneid"] = gene_length["Geneid"].str.replace("[(gene_id )(\")]", "", regex=True)
-    gene_length = gene_length.groupby(['Geneid']).sum()
+    gene_length = gene_length.set_index("Geneid")
+    print(gene_length.head())
 
     #Compute FPKM
     sum_count = counts.sum()
