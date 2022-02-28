@@ -276,7 +276,7 @@ rule normalizeHTseq:
     threads: config["threads"]["normalizeHTseq"]
     run:
         # Generate exon lengths from gtf file
-        shell("./calc_cdna_len.py" + config["GTFname"] + "gene_id > ref/cds_length.tsv")
+        shell("./calc_cdna_len.py " + config["GTFname"] + " gene_id > ref/cds_length.tsv")
         # Compute TPM and FPKM values HTseq raw counts
         shell("python normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count")
 
