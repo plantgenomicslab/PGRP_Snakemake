@@ -3,14 +3,14 @@
 set -x
 set -e
 
-snakemake -p --rerun-incomplete --cluster-config cluster.json \
+snakemake -p --rerun-incomplete --cluster-config config/cluster.json \
 		--snakefile Snakefile_local \
                 --max-jobs-per-second 50 \
 		--max-status-checks-per-second 50 \
 		--jobs 150 \
 		--latency-wait 30 \
 		--notemp \
-		--cluster-status ./src/status.py \
+		--cluster-status ./scripts/status.py \
 		--cluster "sbatch -N {cluster.nodes} --mem={cluster.memory} --cpus-per-task={cluster.ncpus} \
 				-J {cluster.name} \
 				--parsable -A {cluster.account} -p {cluster.partition} \

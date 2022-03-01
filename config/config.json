@@ -16,10 +16,11 @@
     "summarize":2
   },
   "genomeDir":"ref/",
-  "GTFname":"ref/Gmax_508_Wm82.a4.v1.gene.gtf",
+  "GTFname":"ref/Cs_genes_v2_annot_corr.gtf",
   "ref":[
     "ref/SA",
     "ref/SAindex",
     "ref/exonGeTrInfo.tab"
-  ]
+  ],
+ "PAIR_LIST":["-R1", "-R2"]
   }

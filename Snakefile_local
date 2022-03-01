@@ -8,8 +8,6 @@ SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
 
-PAIR_LIST=["1", "2"]
-
 # Load contrasts.txt for DEG calculation (user must provide)
 CONTRASTS_FILE = pd.read_csv("contrasts.txt", sep="\t", header=None)
 
@@ -33,6 +31,9 @@ for rep in REPLICATE_LIST:
 cf = open("config/config.json")
 config_dict = json.load(cf)
 cf.close()
+
+# Get the nomenclature for paired end raw data from config.json
+PAIR_LIST= config_dict["PAIR_LIST"]
 
 # Check for an indexed reference genome based on required files in config.json
 for ref in config_dict["ref"]:
@@ -63,7 +64,8 @@ def allInput():
         for sample in REPLICATE_LOOKUP[replicate]:
             inputs.append("output/" + replicate + "/" + sample + "/bam/" + sample + ".bamAligned.sortedByCoord.out.bam")
             for pair in PAIR_LIST:
-                inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + "_" + pair + ".fq.gz")
+                inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + pair + ".fq.gz")
+                inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + pair + "_fastqc.zip")
     return(inputs)
 
 rule all:
@@ -75,11 +77,11 @@ rule all:
 #            This will perform a dry run and set up the output folders.
 rule fastqc_raw:
     input:
-        "output/{replicate}/{sample}/raw/{sample}_1.fastq.gz",
-        "output/{replicate}/{sample}/raw/{sample}_2.fastq.gz"
+        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
     output:
-        "output/{replicate}/{sample}/raw/{sample}_1_fastqc.zip",
-        "output/{replicate}/{sample}/raw/{sample}_2_fastqc.zip"
+        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + "_fastqc.zip",
+        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + "_fastqc.zip"
     message: "-----Running Fastqc_raw {wildcards.sample}-----"
     threads: config["threads"]["fastqc_raw"]
     log: "output/{replicate}/{sample}/logs/{sample}_raw_fastqc.log"
@@ -89,11 +91,11 @@ rule fastqc_raw:
 
 rule trim:
     input:
-        fwd_fastq = "output/{replicate}/{sample}/raw/{sample}_1.fastq.gz",
-        rev_fastq = "output/{replicate}/{sample}/raw/{sample}_2.fastq.gz"
+        fwd_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+        rev_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
     output:
-        "output/{replicate}/{sample}/trim/{sample}_1.fq.gz",
-        "output/{replicate}/{sample}/trim/{sample}_2.fq.gz"
+        "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
+        "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
     message: "-----Trimming {wildcards.sample}-----"
     log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
     threads: config["threads"]["trim"]
@@ -109,8 +111,8 @@ rule trim:
 
 rule align:
     input:
-        fwd_fastq = "output/{replicate}/{sample}/trim/{sample}_1.fq.gz",
-        rev_fastq = "output/{replicate}/{sample}/trim/{sample}_2.fq.gz"
+        fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
+        rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
     output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
     message: "-----Aligning {wildcards.sample}-----"
     log: "output/{replicate}/{sample}/logs/{sample}_align.log"
