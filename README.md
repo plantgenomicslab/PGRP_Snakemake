@@ -55,6 +55,12 @@ vim config.json
 # Index the reference genome with STAR (make sure genome fasta is unzipped)
 # Helps to run on a compute cluster (computationally expensive)
 STAR  --runThreadN 48g --runMode genomeGenerate --genomeDir . --genomeFastaFiles [genome.fa] --sjdbGTFfile [reference.gtf] --sjdbOverhang 99   --genomeSAindexNbases 12
+
+# Move raw data into output folder structure (modify to suit needs)
+cut -f 1 RunsbyExperiment.tsv  | sed 1d | while read rep; do 
+  cp "/path/to/raw/data/${rep}-R1.fastq.gz" "output/${rep}/${rep}/raw/"
+  cp "/path/to/raw/data/${rep}-R2.fastq.gz" "output/${rep}/${rep}/raw/"
+done
 ```
 
 ## Running the pipeline 
