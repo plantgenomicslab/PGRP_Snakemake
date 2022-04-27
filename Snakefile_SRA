@@ -80,7 +80,7 @@ rule fetchSRA:
     threads: config["threads"]["fetchSRA"]
     run:
         # Download SRA files from NCBI SRA
-        shell("prefetch {wildcards.sample} --output-file {output} 2> {log}")
+        shell("prefetch {wildcards.sample} --output-file {output}")
         # Check sra files to make sure they are valid
         shell("echo '--------Validating {wildcards.sample}.sra--------'")
         shell("set +e")
