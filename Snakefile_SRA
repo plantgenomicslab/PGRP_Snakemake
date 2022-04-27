@@ -75,10 +75,9 @@ rule all:
         allInput()
 
 rule fetchSRA:
-    output: "output/sra/{sample}.sra"
+    output: config["sra_dir"] + "/{sample}.sra" #"output/sra/{sample}.sra"
     message: "-----Fetching {wildcards.sample} SRA files-----"
     threads: config["threads"]["fetchSRA"]
-    log: "output/sra/logs/{sample}_downloadSRA.log"
     run:
         # Download SRA files from NCBI SRA
         shell("prefetch {wildcards.sample} --output-file {output} 2> {log}")
@@ -88,7 +87,7 @@ rule fetchSRA:
         shell("if ! vdb-validate {output}; then echo 'vdb-validate found errors in {output}. Check log here:{log}. Exiting......' && exit 1; fi")
 
 rule convertSRAtoFastq:
-    input: "output/sra/{sample}.sra"
+    input: config["sra_dir"] +"/{sample}.sra" #"output/sra/{sample}.sra"
     output:
         "output/{replicate}/{sample}/raw/{sample}_1.fastq.gz",
         "output/{replicate}/{sample}/raw/{sample}_2.fastq.gz"

@@ -15,12 +15,13 @@
     "DEG_HTseq":8,
     "summarize":2
   },
-  "genomeDir":"ref/",
-  "GTFname":"ref/Cs_genes_v2_annot_corr.gtf",
+  "genomeDir":"/data/gpfs/home/jlomas/pgl_scratch/SynCam/Starch_Degradation_Circuit/AT_Ref/",
+  "sra_dir":"/data/gpfs/home/jlomas/pgl_scratch/ncbi/public/sra",
+  "GTFname":"/data/gpfs/home/jlomas/pgl_scratch/SynCam/Starch_Degradation_Circuit/AT_Ref/Athaliana_167_gene.gtf",
   "ref":[
-    "ref/SA",
-    "ref/SAindex",
-    "ref/exonGeTrInfo.tab"
+    "/data/gpfs/home/jlomas/pgl_scratch/SynCam/Starch_Degradation_Circuit/AT_Ref/SA",
+    "/data/gpfs/home/jlomas/pgl_scratch/SynCam/Starch_Degradation_Circuit/AT_Ref/SAindex",
+    "/data/gpfs/home/jlomas/pgl_scratch/SynCam/Starch_Degradation_Circuit/AT_Ref//exonGeTrInfo.tab"
   ],
- "PAIR_LIST":["-R1", "-R2"]
+ "PAIR_LIST":["_1", "_2"]
   }
