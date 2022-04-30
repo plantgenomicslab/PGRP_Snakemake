@@ -8,8 +8,6 @@ SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
 
-PAIR_LIST=["1", "2"]
-
 # Load contrasts.txt for DEG calculation (user must provide)
 CONTRASTS_FILE = pd.read_csv("contrasts.txt", sep="\t", header=None)
 
@@ -43,6 +41,8 @@ for ref in config_dict["ref"]:
         exit()
 
 configfile: "config/config.json"
+PAIR_LIST = config["PAIR_LIST"]
+LAYOUT = config["libraryType"]
 
 # Generate a list of all target output files
 def allInput():
@@ -64,11 +64,24 @@ def allInput():
         inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
         for sample in REPLICATE_LOOKUP[replicate]:
             inputs.append("output/" + replicate + "/" + sample + "/bam/" + sample + ".bamAligned.sortedByCoord.out.bam")
-            for pair in PAIR_LIST:
-                inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + "_" + pair + ".fastq.gz")
-                inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + "_" + pair + "_fastqc.zip")
-                inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + "_" + pair + ".fq.gz")
-    return(inputs)
+            if LAYOUT == "PAIRED":
+                for pair in PAIR_LIST:
+                    inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample  + pair + ".fastq.gz")
+                    inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample  + pair + "_fastqc.zip")
+                    inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + pair + ".fq.gz")
+            elif LAYOUT == "SINGLE":
+                inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + ".fastq.gz")
+                inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + "_fastqc.zip")
+                inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + "_trimmed.fq.gz")
+            else:
+                print("ERROR: libraryType must be 'SINGLE' or 'PAIRED' ... see config/config.json to set libraryType")
+                quit()
+            return(inputs)
+
+if LAYOUT == "PAIRED":
+    ruleorder: align_PAIRED > align_SINGLE
+elif LAYOUT == "SINGLE":
+    ruleorder: align_SINGLE > align_PAIRED
 
 rule all:
     input:
@@ -86,8 +99,8 @@ rule fetchSRA:
         shell("set +e")
         shell("if ! vdb-validate {output}; then echo 'vdb-validate found errors in {output}. Check log here:{log}. Exiting......' && exit 1; fi")
 
-rule convertSRAtoFastq:
-    input: config["sra_dir"] +"/{sample}.sra" #"output/sra/{sample}.sra"
+rule convertSRAtoFastq_PAIRED:
+    input: config["sra_dir"] +"/{sample}.sra"
     output:
         "output/{replicate}/{sample}/raw/{sample}_1.fastq.gz",
         "output/{replicate}/{sample}/raw/{sample}_2.fastq.gz"
@@ -101,7 +114,20 @@ rule convertSRAtoFastq:
 				--outdir output/{wildcards.replicate}/{wildcards.sample}/raw \
 				2> {log}")
 
-rule fastqc_raw:
+rule convertSRAtoFastq_SINGLE:
+    input: config["sra_dir"] +"/{sample}.sra"
+    output: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
+    message: "-----Converting {wildcards.sample} SRA to Fastq files-----"
+    threads: config["threads"]["convertSRAtoFastq"]
+    log: "output/{replicate}/{sample}/logs/{sample}_fastqdump.log"
+    run:
+        # Convert sra files to fastQ format
+        shell("parallel-fastq-dump --sra-id {wildcards.sample} \
+               --threads {threads} --split-e --gzip \
+               --outdir output/{wildcards.replicate}/{wildcards.sample}/raw \
+               2> {log}")
+
+rule fastqc_raw_PAIRED:
     input:
         "output/{replicate}/{sample}/raw/{sample}_1.fastq.gz",
         "output/{replicate}/{sample}/raw/{sample}_2.fastq.gz"
@@ -115,7 +141,17 @@ rule fastqc_raw:
         # Run quality control on raw reads
         shell("fastqc --threads {threads} {input} 2> {log}")
 
-rule trim:
+rule fastqc_raw_SINGLE:
+    input: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
+    output: "output/{replicate}/{sample}/raw/{sample}_fastqc.zip"
+    message: "-----Running Fastqc_raw {wildcards.sample}-----"
+    threads: config["threads"]["fastqc_raw"]
+    log: "output/{replicate}/{sample}/logs/{sample}_raw_fastqc.log"
+    run:
+        # Run quality control on raw reads
+        shell("fastqc --threads {threads} {input} 2> {log}")
+
+rule trim_PAIRED:
     input:
         fwd_fastq = "output/{replicate}/{sample}/raw/{sample}_1.fastq.gz",
         rev_fastq = "output/{replicate}/{sample}/raw/{sample}_2.fastq.gz"
@@ -135,7 +171,21 @@ rule trim:
         # Run quality control on trimmed reads
         shell("fastqc --threads {threads} {output}")
 
-rule align:
+rule trim_SINGLE:
+    input: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
+    output:"output/{replicate}/{sample}/trim/{sample}_trimmed.fq.gz"
+    message: "-----Trimming {wildcards.sample}-----"
+    log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
+    threads: config["threads"]["trim"]
+    run:
+        # Trim reads using TrimGalore
+        shell("trim_galore --three_prime_clip_R1 5 \
+               --cores {threads} --max_n 40 --gzip -o output/{wildcards.replicate}/{wildcards.sample}/trim {input} \
+               2> {log}")
+        # Run quality control on trimmed reads
+        shell("fastqc --threads {threads} {output}")
+
+rule align_PAIRED:
     input:
         fwd_fastq = "output/{replicate}/{sample}/trim/{sample}_1.fq.gz",
         rev_fastq = "output/{replicate}/{sample}/trim/{sample}_2.fq.gz"
@@ -151,6 +201,25 @@ rule align:
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
                 --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
 		2> {log}")
+        # Perform check on output bam file to ensure it is not corrupted
+        shell("echo '--------Checking {output}----------'")
+        shell("set +e")
+        shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
+
+rule align_SINGLE:
+    input: "output/{replicate}/{sample}/trim/{sample}_trimmed.fq.gz"
+    output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
+    message: "-----Aligning {wildcards.sample}-----"
+    log: "output/{replicate}/{sample}/logs/{sample}_align.log"
+    threads: config["threads"]["align"]
+    run:
+        # Calculate run-level alignments to reference
+        shell("STAR --runMode alignReads --runThreadN {threads} \
+               --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+               --genomeDir " + config["genomeDir"]  + " \
+               --readFilesCommand gunzip -c --readFilesIn {input} \
+               --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
+               2> {log}")
         # Perform check on output bam file to ensure it is not corrupted
         shell("echo '--------Checking {output}----------'")
         shell("set +e")
@@ -176,6 +245,7 @@ rule merge:
         else:
             # Only 1 run in a sample, add it to sample-level output
             shell("cp {input} {output}")
+            print("1 run per sample...skipping BAM merge")
         # Perform check on output bam file to ensure it is not corrupted
         shell("echo '--------Checking {output}----------'")
         shell("set +e")
@@ -276,9 +346,9 @@ rule normalizeHTseq:
     threads: config["threads"]["normalizeHTseq"]
     run:
         # Generate exon lengths from gtf file
-        shell("./scripts/calc_cdna_len.py " + config["GTFname"] + " gene_id > ref/cds_length.tsv")
+        shell("./scripts/calc_cdna_len.py " + config["GTFname"] + " gene_id > " + config["genomeDir"] + "cds_length.tsv")
         # Compute TPM and FPKM values HTseq raw counts
-        shell("python scripts/normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count")
+        shell("python scripts/normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count " + config["genomeDir"])
 
 rule DEG_featureCounts:
     input: 
