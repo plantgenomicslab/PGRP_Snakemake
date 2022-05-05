@@ -14,26 +14,46 @@
 	"ncpus": 2,
 	"memory": "8g"
 	},
-"convertSRAtoFastq":{
+"convertSRAtoFastq_SINGLE":{
 	"ncpus": 8,
 	"memory": "64g"
 	},
-"fastqc_raw":{
+"convertSRAtoFastq_PAIRED":{
+        "ncpus": 8,
+        "memory": "64g"
+        },
+"fastqc_raw_SINGLE":{
 	"ncpus": 2,
 	"memory": "8g"
 	},
-"trim":{
+"fastqc_raw_PAIRED":{
+        "ncpus": 2,
+        "memory": "8g"
+        },
+"trim_SINGLE":{
 	"ncpus": 16,
 	"memory": "64g"
 	},
-"fastqc_trim":{
+"trim_PAIRED":{
+        "ncpus": 16,
+        "memory": "64g"
+        },
+"fastqc_trim_SINGLE":{
 	"ncpus": 2,
 	"memory": "8g"
 	},
-"align":{
+"fastqc_trim_PAIRED":{
+        "ncpus": 2,
+        "memory": "8g"
+        },
+"align_SINGLE":{
 	"ncpus": 16,
 	"memory": "64g"
 	},
+"align_PAIRED":{
+        "ncpus": 16,
+        "memory": "64g"
+        },
 "merge":{
         "ncpus": 16,
         "memory": "64g"
