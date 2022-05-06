@@ -239,7 +239,7 @@ rule normalizeFeatureCounts:
     threads: config["threads"]["normalizeFeatureCounts"]
     run:
         # Compute TPM and FPKM values featureCounts raw counts
-        shell("python ./scripts/normalizeCounts.py featureCounts " + config["GTFname"] + " {input} output/counts/featureCounts/featureCounts")
+        shell("python ./scripts/normalizeCounts.py featureCounts " + config["GTFname"] + " {input} output/counts/featureCounts/featureCounts " + config["genomeDir"])
 
 rule normalizeHTseq:
     input:
@@ -254,7 +254,7 @@ rule normalizeHTseq:
         # Generate exon lengths from gtf file
         shell("./scripts/calc_cdna_len.py " + config["GTFname"] + " gene_id > ref/cds_length.tsv")
         # Compute TPM and FPKM values HTseq raw counts
-        shell("python scripts/normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count")
+        shell("python scripts/normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count " + config["genomeDir"])
 
 rule DEG_featureCounts:
     input: 
