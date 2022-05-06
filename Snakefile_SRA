@@ -196,7 +196,8 @@ rule align_PAIRED:
     run:
         # Calculate run-level alignments to reference
         shell("STAR --runMode alignReads --runThreadN {threads} \
-                --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+                --outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
+		--quantMode TranscriptomeSAM GeneCounts \
 		--genomeDir " + config["genomeDir"]  + " \
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
                 --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
@@ -215,7 +216,8 @@ rule align_SINGLE:
     run:
         # Calculate run-level alignments to reference
         shell("STAR --runMode alignReads --runThreadN {threads} \
-               --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+               --outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
+	       --quantMode TranscriptomeSAM GeneCounts \
                --genomeDir " + config["genomeDir"]  + " \
                --readFilesCommand gunzip -c --readFilesIn {input} \
                --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
@@ -288,7 +290,7 @@ rule featureCounts:
         shell("featureCounts \
                 -o {output.raw} \
                 -T {threads} \
-                -Q 10 \
+                -Q 1 \
                 -p -M \
                 -g gene_id \
                 -a " + config_dict["GTFname"] + " {input} \
@@ -309,7 +311,8 @@ rule HTseq:
         shell("htseq-count \
                  --format bam \
                  --order pos \
-                 --mode intersection-strict \
+                 --mode union \
+		 --stranded=no \
                  --type exon \
                  --idattr gene_id \
                  --nprocesses {threads} \
@@ -333,7 +336,7 @@ rule normalizeFeatureCounts:
     threads: config["threads"]["normalizeFeatureCounts"]
     run:
         # Compute TPM and FPKM values featureCounts raw counts
-        shell("python ./scripts/normalizeCounts.py featureCounts " + config["GTFname"] + " {input} output/counts/featureCounts/featureCounts")
+        shell("python ./scripts/normalizeCounts.py featureCounts " + config["GTFname"] + " {input} output/counts/featureCounts/featureCounts " + config["genomeDir"])
 
 rule normalizeHTseq:
     input:
