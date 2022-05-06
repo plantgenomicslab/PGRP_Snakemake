@@ -56,7 +56,7 @@ def allInput():
               "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
               "output/counts/htseq/htseq-count.tpm.tsv.average.tsv",
               "output/counts/featureCounts/featureCount_clean.cnt",
-              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"],
+              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results",
               "output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"]
     for replicate in REPLICATE_LIST:
         inputs.append("output/" + replicate + "/bam/" + replicate + ".bam")

@@ -15,14 +15,14 @@
     "DEG_HTseq":8,
     "summarize":2
   },
-  "genomeDir":"../../Gmax_ref/",
+  "genomeDir":"ref/",
   "sra_dir":"/data/gpfs/home/jlomas/pgl_scratch/ncbi/public/sra",
-  "GTFname":"../../Gmax_ref/Gmax_508_Wm82.a4.v1.gene.gtf",
+  "GTFname":"ref/Ecurvula.gtf",
   "ref":[
-    "../../Gmax_ref/SA",
-    "../../Gmax_ref/SAindex",
-    "../../Gmax_ref/exonGeTrInfo.tab"
+    "ref/SA",
+    "ref/SAindex",
+    "ref/exonGeTrInfo.tab"
   ],
- "PAIR_LIST":["_1", "_2"],
- "libraryType":"SINGLE"
+ "PAIR_LIST":["_R1", "_R2"],
+ "libraryType":"PAIRED"
   }
