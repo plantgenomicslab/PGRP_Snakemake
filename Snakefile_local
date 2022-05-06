@@ -46,18 +46,18 @@ configfile: "config/config.json"
 # Generate a list of all target output files
 def allInput():
     inputs = ["output/counts/featureCounts/featureCounts.cnt",
-              #"output/counts/htseq/htseq-count.tsv",
+              "output/counts/htseq/htseq-count.tsv",
               "output/counts/featureCounts/featureCounts.tpm.tsv",
               "output/counts/featureCounts/featureCounts.fpkm.tsv",
-              #"output/counts/htseq/htseq-count.tpm.tsv",
-              #"output/counts/htseq/htseq-count.fpkm.tsv",
+              "output/counts/htseq/htseq-count.tpm.tsv",
+              "output/counts/htseq/htseq-count.fpkm.tsv",
               "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
               "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv",
               "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
-              #"output/counts/htseq/htseq-count.tpm.tsv.average.tsv",
+              "output/counts/htseq/htseq-count.tpm.tsv.average.tsv",
               "output/counts/featureCounts/featureCount_clean.cnt",
-              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"]
-              #"output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"]
+              "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"],
+              "output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"]
     for replicate in REPLICATE_LIST:
         inputs.append("output/" + replicate + "/bam/" + replicate + ".bam")
         inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
@@ -120,7 +120,8 @@ rule align:
     run:
         # Calculate run-level alignments to reference
         shell("STAR --runMode alignReads --runThreadN {threads} \
-                --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+                --outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
+		--quantMode TranscriptomeSAM GeneCounts \
 		--genomeDir " + config["genomeDir"]  + " \
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
                 --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
@@ -192,7 +193,7 @@ rule featureCounts:
         shell("featureCounts \
                 -o {output.raw} \
                 -T {threads} \
-                -Q 10 \
+                -Q 1 \
                 -p -M \
                 -g gene_id \
                 -a " + config_dict["GTFname"] + " {input} \
@@ -202,29 +203,30 @@ rule featureCounts:
                 sed 's/\Aligned\.sortedByCoord\.out\.bam//g; s/\.bam//g; s/output\/[A-Za-z0-9_-]*\/bam\///g' \
                 > {output.cleaned}")
 
-#rule HTseq:
-#    message: "-----Generating raw counts (HTseq)-----"
-#    input:expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
-#    output: "output/counts/htseq/htseq-count.tsv"
-#    log: "output/counts/htseq/HTseq.log"
-#    threads: config["threads"]["HTseq"]
-#    run:
-#        # Compute raw gene-wise counts
-#        shell("htseq-count \
-#                 --format bam \
-#                 --order pos \
-#                 --mode intersection-strict \
-#                 --type exon \
-#                 --idattr gene_id \
-#                 --nprocesses {threads} \
-#                 --counts_output {output} \
-#                 {input} " + config_dict["GTFname"] + "  \
-#                 &> {log}")
+rule HTseq:
+    message: "-----Generating raw counts (HTseq)-----"
+    input:expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
+    output: "output/counts/htseq/htseq-count.tsv"
+    log: "output/counts/htseq/HTseq.log"
+    threads: config["threads"]["HTseq"]
+    run:
+        # Compute raw gene-wise counts
+        shell("htseq-count \
+                 --format bam \
+                 --order pos \
+                 --mode union \
+		 --stranded=no \
+                 --type exon \
+                 --idattr gene_id \
+                 --nprocesses {threads} \
+                 --counts_output {output} \
+                 {input} " + config_dict["GTFname"] + "  \
+                 &> {log}")
         # Add headers to label HTseq tsv output fields
-#        shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' {output} &&\
-#               sed -i s/'output\/[A-Za-z0-9_-]*\/bam\/'//g {output}")
-#        # Re-format treatment names in HTseq output
-#        shell("sed -i 's/\.bam//g' {output}")
+        shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' {output} &&\
+               sed -i s/'output\/[A-Za-z0-9_-]*\/bam\/'//g {output}")
+        # Re-format treatment names in HTseq output
+        shell("sed -i 's/\.bam//g' {output}")
 
 rule normalizeFeatureCounts:
     input:
@@ -239,20 +241,20 @@ rule normalizeFeatureCounts:
         # Compute TPM and FPKM values featureCounts raw counts
         shell("python ./scripts/normalizeCounts.py featureCounts " + config["GTFname"] + " {input} output/counts/featureCounts/featureCounts")
 
-#rule normalizeHTseq:
-#    input:
-#        "output/counts/htseq/htseq-count.tsv"
-#    output:
-#        tpm = "output/counts/htseq/htseq-count.tpm.tsv",
-#        fpkm = "output/counts/htseq/htseq-count.fpkm.tsv"
-#    message: "------- Normalizing HTseq ---------"
-#    log: "output/counts/htseq/normalize_HTseq.log"
-#    threads: config["threads"]["normalizeHTseq"]
-#    run:
-#        # Generate exon lengths from gtf file
-#        shell("./scripts/calc_cdna_len.py " + config["GTFname"] + " gene_id > ref/cds_length.tsv")
-#        # Compute TPM and FPKM values HTseq raw counts
-#        shell("python scripts/normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count")
+rule normalizeHTseq:
+    input:
+        "output/counts/htseq/htseq-count.tsv"
+    output:
+        tpm = "output/counts/htseq/htseq-count.tpm.tsv",
+        fpkm = "output/counts/htseq/htseq-count.fpkm.tsv"
+    message: "------- Normalizing HTseq ---------"
+    log: "output/counts/htseq/normalize_HTseq.log"
+    threads: config["threads"]["normalizeHTseq"]
+    run:
+        # Generate exon lengths from gtf file
+        shell("./scripts/calc_cdna_len.py " + config["GTFname"] + " gene_id > ref/cds_length.tsv")
+        # Compute TPM and FPKM values HTseq raw counts
+        shell("python scripts/normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count")
 
 rule DEG_featureCounts:
     input: 
@@ -266,37 +268,37 @@ rule DEG_featureCounts:
         # Compute differentially expressed genes based on contrasts.txt
         shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
 
-#rule DEG_HTseq:
-#    input:
-#        HTseq = "output/counts/htseq/htseq-count.tsv"
-#    output:
-#        HTseq = "output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
-#    message: "-------Calculating DEGs {output}---------"
-#    log: "output/DEG/DEG_HTseq.log"
-#    threads: config["threads"]["DEG_HTseq"]
-#    run:
-#        # Compute differentially expressed genes based on contrasts.txt
-#        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+rule DEG_HTseq:
+    input:
+        HTseq = "output/counts/htseq/htseq-count.tsv"
+    output:
+        HTseq = "output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
+    message: "-------Calculating DEGs {output}---------"
+    log: "output/DEG/DEG_HTseq.log"
+    threads: config["threads"]["DEG_HTseq"]
+    run:
+        # Compute differentially expressed genes based on contrasts.txt
+        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
 
 rule summarize:
     input: 
         tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
         featureCounts_TPM = "output/counts/featureCounts/featureCounts.tpm.tsv",
-        featureCounts_FPKM = "output/counts/featureCounts/featureCounts.fpkm.tsv"
-        #HTseq_TPM = "output/counts/htseq/htseq-count.tpm.tsv",
-        #HTseq_FPKM = "output/counts/htseq/htseq-count.fpkm.tsv"
+        featureCounts_FPKM = "output/counts/featureCounts/featureCounts.fpkm.tsv",
+        HTseq_TPM = "output/counts/htseq/htseq-count.tpm.tsv",
+        HTseq_FPKM = "output/counts/htseq/htseq-count.fpkm.tsv"
     output: 
         "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv",
-        "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv"
-        #"output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
+        "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
+        "output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
     message: "--------------Summarizing Normalized Counts--------------"
     threads: config["threads"]["summarize"]
     run:
         # Compute summary statistics (average/standard deviation) from TPMcalculator TPM values
         shell("./scripts/summarizeNormalizedCounts.py Gene_Id {input.tpmcalc}")
         # Compute summary statistics (average/standard deviation) from HTseq FPKM/TPM values
-        #shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_TPM}")
-        #shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_FPKM}")
+        shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_TPM}")
+        shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_FPKM}")
         # Compute summary statistics (average/standard deviation) from featureCounts FPKM/TPM values
         shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
         shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")
