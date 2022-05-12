@@ -28,7 +28,7 @@ for rep in REPLICATE_LIST:
         os.makedirs("output/" + rep + "/" + r  + "/trim/", exist_ok=True)
 
 # Load the config file as a dictionary
-cf = open("config/config.json")
+cf = open("config.json")
 config_dict = json.load(cf)
 cf.close()
 
