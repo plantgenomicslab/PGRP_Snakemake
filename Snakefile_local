@@ -41,7 +41,7 @@ for ref in config_dict["ref"]:
         print("The " + ref + " file is missing. Have you downloaded and indexed a refernce genome? Terminating...")
         exit()
 
-configfile: "config/config.json"
+configfile: "config.json"
 
 # Generate a list of all target output files
 def allInput():
