@@ -41,7 +41,7 @@ for ref in config_dict["ref"]:
         exit()
 
 configfile: "config.json"
-PAIR_LIST = config["PAIR_LIST"]
+PAIR_LIST = ["_1", "_2"]
 LAYOUT = config["libraryType"]
 
 # Generate a list of all target output files
