@@ -14,6 +14,10 @@
 	"ncpus": 2,
 	"memory": "8g"
 	},
+"importRaw":{
+        "ncpus":2,
+        "memory":"8g"
+        },
 "convertSRAtoFastq_SINGLE":{
 	"ncpus": 8,
 	"memory": "64g"

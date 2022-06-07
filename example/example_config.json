@@ -1,4 +1,5 @@
 {"threads":{
+    "importRaw":2,
     "fetchSRA":2,
     "convertSRAtoFastq":8,
     "fastqc_raw": 2,
@@ -15,6 +16,7 @@
     "DEG_HTseq":8,
     "summarize":2
   },
+  "rawInputDir":"path/to/data",
   "genomeDir":"ref/",
   "sra_dir":"/path/to/sra/dir",
   "GTFname":"ref/species.gtf",
