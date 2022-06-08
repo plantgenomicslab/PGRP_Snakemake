@@ -2,11 +2,10 @@ import sys
 import os
 import pandas as pd
 
-# Load run and sample information from the RunsbyExperiment.tsv input file (user must provide)
+# Load run and replicate information from the RunsbyExperiment.tsv input file (user must provide)
 SAMPLES_FILE = pd.read_csv("RunsbyExperiment.tsv", sep="\t")
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
-REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
 
 # Load contrasts.txt for DEG calculation (user must provide)
 contrasts = os.path.exists("contrasts.txt")
@@ -18,7 +17,7 @@ else:
     cTop = ""
     cBottom = ""
 
-# Create sample output folders
+# Create replicate output folders
 os.makedirs("output/counts/", exist_ok=True)
 os.makedirs("output/logs/", exist_ok=True)
 os.makedirs("output/DEG/", exist_ok=True)
@@ -28,11 +27,9 @@ os.makedirs("output/counts/tpmcalculator", exist_ok=True)
 
 for rep in REPLICATE_LIST:
     os.makedirs("output/" + rep + "/bam/", exist_ok=True)
-    for r in REPLICATE_LOOKUP[rep]:
-        os.makedirs("output/" + rep + "/" + r  + "/raw/", exist_ok=True)
-        os.makedirs("output/" + rep + "/" + r  + "/bam/", exist_ok=True)
-        os.makedirs("output/" + rep + "/" + r  + "/logs/", exist_ok=True)
-        os.makedirs("output/" + rep + "/" + r  + "/trim/", exist_ok=True)
+    os.makedirs("output/" + rep + "/raw/", exist_ok=True)
+    os.makedirs("output/" + rep + "/logs/", exist_ok=True)
+    os.makedirs("output/" + rep + "/trim/", exist_ok=True)
 
 # Load the config file as a dictionary
 cf = open("config.json")
@@ -64,14 +61,12 @@ def allInput():
               "output/counts/htseq/htseq-count.tpm.tsv.average.tsv",
               "output/counts/featureCounts/featureCount_clean.cnt"]
     for replicate in REPLICATE_LIST:
-        inputs.append("output/" + replicate + "/bam/" + replicate + ".bam")
         inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
-        for sample in REPLICATE_LOOKUP[replicate]:
-            inputs.append("output/" + replicate + "/" + sample + "/bam/" + sample + ".bamAligned.sortedByCoord.out.bam")
-            for pair in PAIR_LIST:
-                inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + pair + ".fq.gz")
-                inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + pair + "_fastqc.zip")
-                inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + pair + ".fastq.gz")
+        inputs.append("output/" + replicate + "/bam/" + replicate + ".bamAligned.sortedByCoord.out.bam")
+        for pair in PAIR_LIST:
+            inputs.append("output/" + replicate + "/trim/" + replicate + pair + ".fq.gz")
+            inputs.append("output/" + replicate + "/raw/" + replicate + pair + "_fastqc.zip")
+            inputs.append("output/" + replicate + "/raw/" + replicate + pair + ".fastq.gz")
     if contrasts:
         inputs.append("output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
         inputs.append("output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
@@ -82,53 +77,53 @@ rule all:
         allInput()
 
 rule importRaw:
-    output: "output/{replicate}/{sample}/raw/{sample}{pair}.fastq.gz"
-    message: "Importing raw data: {wildcards.sample}, {wildcards.pair}"
+    output: "output/{replicate}/raw/{replicate}_{pair}.fastq.gz"
+    message: "Importing raw data: cp " + config["rawInputDir"] + "/{wildcards.replicate}_{wildcards.pair}.fastq.gz {output}"
     threads: config["threads"]["importRaw"]
     run:
-        shell("cp " + config["rawInputDir"] + "/{wildcards.sample}{wildcards.pair}.fastq.qz {output}")
+        shell("cp " + config["rawInputDir"] + "/{wildcards.replicate}_{wildcards.pair}.fastq.gz {output}")
 
 rule fastqc_raw:
     input:
-        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
-        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
+        "output/{replicate}/raw/{replicate}" + PAIR_LIST[0] + ".fastq.gz",
+        "output/{replicate}/raw/{replicate}" + PAIR_LIST[1] + ".fastq.gz"
     output:
-        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + "_fastqc.zip",
-        "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + "_fastqc.zip"
-    message: "-----Running Fastqc_raw {wildcards.sample}-----"
+        "output/{replicate}/raw/{replicate}" + PAIR_LIST[0] + "_fastqc.zip",
+        "output/{replicate}/raw/{replicate}" + PAIR_LIST[1] + "_fastqc.zip"
+    message: "-----Running Fastqc_raw {wildcards.replicate}-----"
     threads: config["threads"]["fastqc_raw"]
-    log: "output/{replicate}/{sample}/logs/{sample}_raw_fastqc.log"
+    log: "output/{replicate}/logs/{replicate}_raw_fastqc.log"
     run:
         # Run quality control on raw reads
-        shell("fastqc --threads {threads} {input} --outdir output/{wildcards.replicate}/{wildcards.sample}/raw/ 2> {log}")
+        shell("fastqc --threads {threads} {input} --outdir output/{wildcards.replicate}/raw/ 2> {log}")
 
 rule trim:
     input:
-        fwd_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
-        rev_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+        fwd_fastq = "output/{replicate}/raw/{replicate}" + PAIR_LIST[0] + ".fastq.gz",
+        rev_fastq = "output/{replicate}/raw/{replicate}" + PAIR_LIST[1] + ".fastq.gz",
     output:
-        "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
-        "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
-    message: "-----Trimming {wildcards.sample}-----"
-    log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
+        "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
+        "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
+    message: "-----Trimming {wildcards.replicate}-----"
+    log: "output/{replicate}/logs/{replicate}_trim.log"
     threads: config["threads"]["trim"]
     run:
         # Trim reads using TrimGalore
         shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 5 \
-             --cores {threads} --max_n 40 --gzip -o output/{wildcards.replicate}/{wildcards.sample}/trim {input.fwd_fastq} {input.rev_fastq} \
+             --cores {threads} --max_n 40 --gzip -o output/{wildcards.replicate}/trim {input.fwd_fastq} {input.rev_fastq} \
              2> {log}")
         # Update filenames to improve MultiQC output format
-        shell("for file in output/{wildcards.replicate}/{wildcards.sample}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
+        shell("for file in output/{wildcards.replicate}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
         # Run quality control on trimmed reads
         shell("fastqc --threads {threads} {output}")
 
 rule align:
     input:
-        fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
-        rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
-    output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
-    message: "-----Aligning {wildcards.sample}-----"
-    log: "output/{replicate}/{sample}/logs/{sample}_align.log"
+        fwd_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
+        rev_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
+    output:"output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam"
+    message: "-----Aligning {wildcards.replicate}-----"
+    log: "output/{replicate}/logs/{replicate}_align.log"
     threads: config["threads"]["align"]
     run:
         # Calculate run-level alignments to reference
@@ -137,53 +132,31 @@ rule align:
 		--quantMode TranscriptomeSAM GeneCounts \
 		--genomeDir " + config["genomeDir"]  + " \
 	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
-                --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
+                --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.bam  \
 		2> {log}")
         # Perform check on output bam file to ensure it is not corrupted
         shell("echo '--------Checking {output}----------'")
         shell("set +e")
         shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
-def mergeInput(wildcards):
-    inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
-    return(inputs)
-
-rule merge:
-    input: mergeInput
-    output: "output/{replicate}/bam/{replicate}.bam"
-    message: "-----Merging bam files by experiment-----"
-    log: "output/{replicate}/bam/{replicate}_merge.log"
-    threads: config["threads"]["merge"]
-    run:
-        # note: bam files must be sorted in same manner prior to merge
-        if len(REPLICATE_LOOKUP[wildcards.replicate]) > 1:
-            # Merge bam files from same sample
-            shell("samtools merge --threads {threads} -o {output} {input}") 
-            # Create bam index folder for HTseq
-            shell("samtools index {output}") 
-        else:
-            # Only 1 run in a sample, add it to sample-level output
-            shell("cp {input} {output}")
-        # Perform check on output bam file to ensure it is not corrupted
-        shell("echo '--------Checking {output}----------'")
-        shell("set +e")
-        shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule TPMCalculator:
-    input: "output/{replicate}/bam/{replicate}.bam"
+    input: "output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam"
     output: "output/counts/tpmcalculator/{replicate}_genes.out"
-    message: "------- Calculating TPM --------"
+    message: "------- Calculating TPM: {wildcards.replicate} --------"
     #log: "output/counts/tpmcalculator/tpm-calculator.log"
     threads: config["threads"]["TPMCalculator"]
     run:
-        # Perform TPM calculation using each sample-level bam file
+        # Perform TPM calculation using each replicate-level bam file
         shell("TPMCalculator \
                -k gene_id \
                -t transcript_id \
                -o 0 \
                -g " + config_dict["GTFname"] + " -b {input}")
         # Move output files to proper location
-        shell("mv {wildcards.replicate}_genes.* output/counts/tpmcalculator/")
+        shell("mv {wildcards.replicate}.bamAligned.sortedByCoord.out_genes.out output/counts/tpmcalculator/{wildcards.replicate}_genes.out")
+        shell("mv {wildcards.replicate}.bamAligned.sortedByCoord.out_genes.ent output/counts/tpmcalculator/{wildcards.replicate}_genes.ent")
+        shell("mv {wildcards.replicate}.bamAligned.sortedByCoord.out_genes.uni output/counts/tpmcalculator/{wildcards.replicate}_genes.uni")
 
 rule mergeTPMCalculator:
     input: expand("output/counts/tpmcalculator/{replicate}_genes.out", replicate=REPLICATE_LIST)
@@ -195,14 +168,14 @@ rule mergeTPMCalculator:
 
 rule featureCounts:
     message: "-----Generating raw counts (featureCounts)-----"
-    input: expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
+    input: expand("output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam", replicate=REPLICATE_LIST)
     output: 
         raw = "output/counts/featureCounts/featureCounts.cnt",
         cleaned = "output/counts/featureCounts/featureCount_clean.cnt"
     log: "output/counts/featureCounts/featureCounts.log"
     threads: config["threads"]["featureCount"]
     run:
-        # Calculate raw counts from all sample-level bam files
+        # Calculate raw counts from all replicate-level bam files
         shell("featureCounts \
                 -o {output.raw} \
                 -T {threads} \
@@ -218,7 +191,7 @@ rule featureCounts:
 
 rule HTseq:
     message: "-----Generating raw counts (HTseq)-----"
-    input:expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
+    input:expand("output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam", replicate=REPLICATE_LIST)
     output: "output/counts/htseq/htseq-count.tsv"
     log: "output/counts/htseq/HTseq.log"
     threads: config["threads"]["HTseq"]
@@ -239,7 +212,7 @@ rule HTseq:
         shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' {output} &&\
                sed -i s/'output\/[A-Za-z0-9_-]*\/bam\/'//g {output}")
         # Re-format treatment names in HTseq output
-        shell("sed -i 's/\.bam//g' {output}")
+        shell("sed -i 's/\.bamAligned.sortedByCoord.out.bam//g' {output}")
 
 rule normalizeFeatureCounts:
     input:
@@ -279,7 +252,7 @@ rule DEG_featureCounts:
     threads: config["threads"]["DEG_featureCounts"]
     run:
         # Compute differentially expressed genes based on contrasts.txt
-        shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+        shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --replicates_file contrasts.txt --output output/DEG")
 
 rule DEG_HTseq:
     input:
@@ -291,7 +264,7 @@ rule DEG_HTseq:
     threads: config["threads"]["DEG_HTseq"]
     run:
         # Compute differentially expressed genes based on contrasts.txt
-        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --replicates_file contrasts.txt --output output/DEG")
 
 rule summarize:
     input: 
