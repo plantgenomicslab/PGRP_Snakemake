@@ -17,13 +17,21 @@ else:
     cTop = ""
     cBottom = ""
 
+# Load the config file as a dictionary
+cf = open("config.json")
+config_dict = json.load(cf)
+cf.close()
+
 # Create replicate output folders
 os.makedirs("output/counts/", exist_ok=True)
 os.makedirs("output/logs/", exist_ok=True)
 os.makedirs("output/DEG/", exist_ok=True)
-os.makedirs("output/counts/featureCounts/", exist_ok=True)
-os.makedirs("output/counts/htseq/", exist_ok=True)
-os.makedirs("output/counts/tpmcalculator", exist_ok=True)
+if config["readCounting"] == "RSEM":
+    os.makedirs("output/counts/RSEM/", exist_ok=True)
+else:
+    os.makedirs("output/counts/featureCounts/", exist_ok=True)
+    os.makedirs("output/counts/htseq/", exist_ok=True)
+    os.makedirs("output/counts/tpmcalculator", exist_ok=True)
 
 for rep in REPLICATE_LIST:
     os.makedirs("output/" + rep + "/bam/", exist_ok=True)
@@ -31,25 +39,27 @@ for rep in REPLICATE_LIST:
     os.makedirs("output/" + rep + "/logs/", exist_ok=True)
     os.makedirs("output/" + rep + "/trim/", exist_ok=True)
 
-# Load the config file as a dictionary
-cf = open("config.json")
-config_dict = json.load(cf)
-cf.close()
-
 # Get the nomenclature for paired end raw data from config.json
 PAIR_LIST= config_dict["PAIR_LIST"]
 
-# Check for an indexed reference genome based on required files in config.json
-for ref in config_dict["ref"]:
-    if not os.path.exists(ref):
-        print("The " + ref + " file is missing. Have you downloaded and indexed a refernce genome? Terminating...")
-        exit()
+# Check for an indexed reference genome or prepared genome for RSEM
+if config["readCounting"] == "RSEM":
+    if not os.path.exists(config["RSEM_prepared_genome"]):
+        sys.exit(f"Cannot locate '{config["RSEM_prepared_genome"]}'.\nProvide a reference genome prepared with 'rsem-prepare-reference' to use RSEM.\nExiting...")
+else:
+    for ref in config_dict["ref"]:
+        if not os.path.exists(ref):
+            sys.exit("The " + ref + " file is missing.\nHave you provided the correct paths to an indexed a refernce genome?\nExiting...")
 
 configfile: "config.json"
 
 # Generate a list of all target output files
 def allInput():
-    inputs = ["output/counts/featureCounts/featureCounts.cnt",
+    if config["readCounting"] == "RSEM":
+        inputs = ["output/counts/RSEM/RSEM.tpm.tsv.average.tsv",
+                "output/counts/RSEM/RSEM_TPM.tsv",]
+    else:
+        inputs = ["output/counts/featureCounts/featureCounts.cnt",
               "output/counts/htseq/htseq-count.tsv",
               "output/counts/featureCounts/featureCounts.tpm.tsv",
               "output/counts/featureCounts/featureCounts.fpkm.tsv",
@@ -61,15 +71,21 @@ def allInput():
               "output/counts/htseq/htseq-count.tpm.tsv.average.tsv",
               "output/counts/featureCounts/featureCount_clean.cnt"]
     for replicate in REPLICATE_LIST:
-        inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
-        inputs.append("output/" + replicate + "/bam/" + replicate + ".bamAligned.sortedByCoord.out.bam")
+        if config["readCounting"] == "RSEM"
+            inputs.append("output/" + replicate + "/bam/" + replicate + ".xs.bamAligned.sortedByCoord.out.bam")
+        else:
+            inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
+            inputs.append("output/" + replicate + "/bam/" + replicate + ".bamAligned.sortedByCoord.out.bam")
         for pair in PAIR_LIST:
             inputs.append("output/" + replicate + "/trim/" + replicate + pair + ".fq.gz")
             inputs.append("output/" + replicate + "/raw/" + replicate + pair + "_fastqc.zip")
             inputs.append("output/" + replicate + "/raw/" + replicate + pair + ".fastq.gz")
     if contrasts:
-        inputs.append("output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
-        inputs.append("output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
+        if config["readCounting"] == "RSEM":
+            inputs.append("output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
+        else:
+            inputs.append("output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
+            inputs.append("output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
     return(inputs)
 
 rule all:
@@ -117,13 +133,13 @@ rule trim:
         # Run quality control on trimmed reads
         shell("fastqc --threads {threads} {output}")
 
-rule align:
+rule alignSTAR:
     input:
         fwd_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
         rev_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
     output:"output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam"
     message: "-----Aligning {wildcards.replicate}-----"
-    log: "output/{replicate}/logs/{replicate}_align.log"
+    log: "output/{replicate}/logs/{replicate}_alignRSEM.log"
     threads: config["threads"]["align"]
     run:
         # Calculate run-level alignments to reference
@@ -139,6 +155,33 @@ rule align:
         shell("set +e")
         shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
+rule alignRSEM:
+    input:
+        fwd_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
+        rev_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
+    output:"output/{replicate}/bam/{replicate}.xs.bamAligned.sortedByCoord.out.bam"
+    message: "-----Aligning for RSEM: {wildcards.replicate}-----"
+    log: "output/{replicate}/logs/{replicate}_alignRSEM.log"
+    threads: config["threads"]["align"]
+    run:
+        # Calculate run-level alignments to reference
+        shell("STAR --runMode alignReads --runThreadN {threads} \
+            --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+            --genomeDir " + config["genomeDir"]  + " \
+            --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
+            --outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
+            --quantTranscriptomeBan IndelSoftclipSingleend  \
+            --alignEndsType EndToEnd  \
+            --outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.xs.bam")
+
+rule calculateRSEMExpression:
+    input: "output/{replicate}/bam/{replicate}.xs.bamAligned.sortedByCoord.out.bam"
+    output: "output/counts/RSEM/{replicate}.genes.results"
+    message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
+    threads: config["threads"]["calculateRSEMExpression"]
+    run:
+        shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
+            --paired-end {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
 
 rule TPMCalculator:
     input: "output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam"
@@ -266,6 +309,22 @@ rule DEG_HTseq:
         # Compute differentially expressed genes based on contrasts.txt
         shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --replicates_file contrasts.txt --output output/DEG")
 
+def input_DEG_RSEM(wildcards):
+    inputs = expand("output/counts/RSEM/" + wildcards.replicate + ".genes.results")
+    return(inputs)
+
+rule DEG_RSEM:
+    input: input_DEG_RSEM
+    output: "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results"
+    message: "-------Calculating RSEM DEGs {output}---------"
+    log: "output/DEG/DEG_RSEM.log"
+    threads: config["threads"]["DEG_RSEM"]
+    run:
+        # Merge RESM output files into matrix
+        shell("./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
+        # Compute differentially expressed genes based on contrasts.txt
+        shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --replicates_file contrasts.txt --output output/DEG")
+
 rule summarize:
     input: 
         tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
@@ -289,3 +348,16 @@ rule summarize:
         shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
         shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")
 
+rule summarizeRSEM:
+    input: input_DEG_RSEM
+    output: 
+        "output/counts/RSEM/RSEM.tpm.tsv.average.tsv",
+        "output/counts/RSEM/RSEM_TPM.tsv"
+    message: "------ Summarizing RSEM ------"
+    run:
+        # Make RSEM tpm/fpkm matrices
+        shell("./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM TPM")
+        shell("./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM FPKM")
+        # Summarize RSEM data
+        shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_TPM.tsv")
+        shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_FPKM.tsv")

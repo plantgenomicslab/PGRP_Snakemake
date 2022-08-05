@@ -34,11 +34,19 @@
         "ncpus": 2,
         "memory": "8g"
         },
+"fastqc_raw":{
+        "ncpus": 2,
+        "memory": "8g"
+        },
 "trim_SINGLE":{
 	"ncpus": 16,
 	"memory": "64g"
 	},
 "trim_PAIRED":{
+        "ncpus": 16,
+        "memory": "64g"
+        },
+"trim":{
         "ncpus": 16,
         "memory": "64g"
         },
@@ -55,6 +63,18 @@
 	"memory": "64g"
 	},
 "align_PAIRED":{
+        "ncpus": 16,
+        "memory": "64g"
+        },
+"alignSTAR":{
+        "ncpus": 16,
+        "memory": "64g"
+        },
+"alignRSEM":{
+        "ncpus": 16,
+        "memory": "64g"
+        },
+"calculateRSEMExpression":{
         "ncpus": 16,
         "memory": "64g"
         },
@@ -94,8 +114,16 @@
        "ncpus": 8,
        "memory": "64g"
        },
+"DEG_RSEM":{
+        "ncpus": 8,
+       "memory": "64g"
+        },
 "summarize":{
        "ncpus":2,
        "memory":"8g"
-       }
+       },
+"summarizeRSEM":{
+        "ncpus":2,
+       "memory":"8g"
+        }
 }

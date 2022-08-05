@@ -5,6 +5,7 @@
     "fastqc_raw": 2,
     "trim": 16,
     "align": 16,
+    "calculateRSEMExpression": 16,
     "merge": 16,
     "featureCount":16,
     "HTseq":16,
@@ -14,10 +15,12 @@
     "mergeTPMCalculator": 2,
     "DEG_featureCounts":8,
     "DEG_HTseq":8,
+    "DEG_RSEM":8,
     "summarize":2
   },
   "rawInputDir":"path/to/data",
   "genomeDir":"ref/",
+  "RSEM_prepared_genome":"path/to/prepared/genome",
   "sra_dir":"/path/to/sra/dir",
   "GTFname":"ref/species.gtf",
   "ref":[
@@ -26,5 +29,6 @@
     "ref/exonGeTrInfo.tab"
   ],
  "PAIR_LIST":["_R1", "_R2"],
- "libraryType":"PAIRED"
+ "libraryType":"PAIRED",
+ "readCounting":"RSEM" 
   }
