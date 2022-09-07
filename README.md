@@ -131,11 +131,11 @@ Because these files can tedious to generate for projects with many samples, a sc
 If **running locally**, the 'Run' and 'Replicate' fields of ```RunsbyExperiment.tsv``` my be omitted. The 'Replicate' field should represent the prefixes of all fastq files to be included in the analysis. 'Treatment' then should be the desired name of the treatment to which each replicate belongs. Make sure to update ```config.json``` with the nomenclature for paired-ends. 
 
 #### DE control file
-Another optional control file called ```contrasts.txt``` must be created if differential expression analysis is desired. If the file is missing then DE analysis will not be performed. ```contrasts.txt``` provides tab separated contrasts to be used in differential gene expression analysis using DESeq2. The first column defines treatments and the second column defines replicates associated with each treatment. Pairwise differentially expressed genes will be computed for each combination of treatments. See ```example/``` for an example:
+Another optional control file called ```deg_samples.txt``` must be created if differential expression analysis is desired. If the file is missing then DE analysis will not be performed. ```deg_samples.txt``` provides tab separated contrasts to be used in differential gene expression analysis using DESeq2. The first column defines treatments and the second column defines replicates associated with each treatment. Pairwise differentially expressed genes will be computed for each combination of treatments. See ```example/``` for an example:
 
 ```
-# Example format of contrasts.txt
-cat contrasts.txt
+# Example format of deg_samples.txt
+cat deg_samples.txt
 
 ZT0	ZT0_rep1
 ZT0	ZT0_rep2

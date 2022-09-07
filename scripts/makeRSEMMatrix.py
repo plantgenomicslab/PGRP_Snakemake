@@ -10,7 +10,7 @@ if len(sys.argv) < 4:
 
 #load RunsByExperiment.tsv and extract replicate names
 rbe = pd.read_csv(sys.argv[1], sep="\t")
-rbe = list(rbe["Replicates"].values)
+rbe = list(rbe["Replicate"].values)
 
 matrix = pd.DataFrame()
 

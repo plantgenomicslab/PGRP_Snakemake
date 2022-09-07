@@ -7,20 +7,24 @@ SAMPLES_FILE = pd.read_csv("RunsbyExperiment.tsv", sep="\t")
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
 
-# Load contrasts.txt for DEG calculation (user must provide)
-contrasts = os.path.exists("contrasts.txt")
-if contrasts:
-    CONTRASTS_FILE = pd.read_csv("contrasts.txt", sep="\t", header=None)
-    cTop = CONTRASTS_FILE.iloc[1][0]
-    cBottom = CONTRASTS_FILE.iloc[-1][0]
-else:
-    cTop = ""
-    cBottom = ""
-
 # Load the config file as a dictionary
 cf = open("config.json")
 config_dict = json.load(cf)
 cf.close()
+
+# Load deg_samples.txt for DEG calculation (user must provide)
+contrasts = os.path.exists("deg_samples.txt")
+if config_dict["runDEG"] == "yes":
+    if contrasts:
+        CONTRASTS_FILE = pd.read_csv("deg_samples.txt", sep="\t", header=None)
+        cTop = CONTRASTS_FILE.iloc[1][0]
+        cBottom = CONTRASTS_FILE.iloc[-1][0]
+    else:
+        cTop = ""
+        cBottom = ""
+else:
+    cTop = ""
+    cBottom = ""
 
 # Create replicate output folders
 os.makedirs("output/counts/", exist_ok=True)
@@ -72,7 +76,7 @@ def allInput():
               "output/counts/featureCounts/featureCount_clean.cnt"]
     for replicate in REPLICATE_LIST:
         if config_dict["readCounting"] == "RSEM":
-            inputs.append("output/" + replicate + "/bam/" + replicate + ".xs.bamAligned.sortedByCoord.out.bam")
+            inputs.append("output/" + replicate + "/bam/" + replicate + ".xs.bamAligned.toTranscriptome.out.bam")
             inputs.append("output/counts/RSEM/" + replicate + ".genes.results")
         else:
             inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
@@ -81,7 +85,7 @@ def allInput():
             inputs.append("output/" + replicate + "/trim/" + replicate + pair + ".fq.gz")
             inputs.append("output/" + replicate + "/raw/" + replicate + pair + "_fastqc.zip")
             inputs.append("output/" + replicate + "/raw/" + replicate + pair + ".fastq.gz")
-    if contrasts:
+    if config_dict["runDEG"] == "yes":
         if config_dict["readCounting"] == "RSEM":
             inputs.append("output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
         else:
@@ -295,8 +299,8 @@ rule DEG_featureCounts:
     log: "output/DEG/DEG_featureCounts.log"
     threads: config["threads"]["DEG_featureCounts"]
     run:
-        # Compute differentially expressed genes based on contrasts.txt
-        shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --replicates_file contrasts.txt --output output/DEG")
+        # Compute differentially expressed genes based on deg_samples.txt
+        shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --replicates_file deg_samples.txt --output output/DEG")
 
 rule DEG_HTseq:
     input:
@@ -307,8 +311,8 @@ rule DEG_HTseq:
     log: "output/DEG/DEG_HTseq.log"
     threads: config["threads"]["DEG_HTseq"]
     run:
-        # Compute differentially expressed genes based on contrasts.txt
-        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --replicates_file contrasts.txt --output output/DEG")
+        # Compute differentially expressed genes based on deg_samples.txt
+        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --replicates_file deg_samples.txt --output output/DEG")
 
 def input_DEG_RSEM(wildcards):
     inputs = expand("output/counts/RSEM/{replicate}.genes.results", replicate=REPLICATE_LIST)
@@ -322,9 +326,9 @@ rule DEG_RSEM:
     threads: config["threads"]["DEG_RSEM"]
     run:
         # Merge RESM output files into matrix
-        shell("./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
-        # Compute differentially expressed genes based on contrasts.txt
-        shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --replicates_file contrasts.txt --output output/DEG")
+        shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
+        # Compute differentially expressed genes based on deg_samples.txt
+        shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file deg_samples.txt --output output/DEG")
 
 rule summarize:
     input: 
@@ -357,8 +361,8 @@ rule summarizeRSEM:
     message: "------ Summarizing RSEM ------"
     run:
         # Make RSEM tpm/fpkm matrices
-        shell("./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM TPM")
-        shell("./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM FPKM")
+        shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM TPM")
+        shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM FPKM")
         # Summarize RSEM data
         shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_TPM.tsv")
         shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_FPKM.tsv")

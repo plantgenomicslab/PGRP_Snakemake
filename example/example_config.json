@@ -30,5 +30,6 @@
   ],
  "PAIR_LIST":["_R1", "_R2"],
  "libraryType":"PAIRED",
- "readCounting":"RSEM" 
+ "readCounting":"RSEM",
+ "runDEG":"yes" 
   }
