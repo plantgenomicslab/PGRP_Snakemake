@@ -10,6 +10,6 @@ snakemake -p --rerun-incomplete --cluster-config cluster.json \
 		  --jobs 50 \
 		  --latency-wait 440 \
 		  --notemp \
-		  --cluster-status ./src/status.py \
+		  --cluster-status ./script/status.py \
           "$@"
 
