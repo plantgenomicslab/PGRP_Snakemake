@@ -57,7 +57,7 @@ mamba install -c bioconda -c conda-forge -c anaconda trim-galore=0.6.7 sra-tools
 Add ```config.json``` to the repo. This file controls various inputs to the workflow and must be updated by the user. A template for ```config.json``` is availble in the ```example/``` directory. 
 ```
 cd .../PGRP_Snakemake
-cp example/example_config.json .
+cp example/example_config.json config.json
 ```
 
 Configure SRA Toolkit (only necessary if using SRA). The following commands allow you to specify where large SRA files get stored and ensure that your connection doesn't time out when downloading data from NCBI's SRA database.
