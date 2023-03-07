@@ -39,6 +39,8 @@ git clone git@github.com:plantgenomicslab/PGRP_Snakemake.git
 - TPMcalculator
 - Bioconductor Qvalue
 - RSEM
+- tabulate 0.8.10
+- fastp 0.23.2
 
 ### Setting up a Conda environment 
 
@@ -49,7 +51,7 @@ conda create -n PGRP_Snakemake -c bioconda -c conda-forge python=3.7 mamba
 
 conda activate PGRP_Snakemake
 
-mamba install -c bioconda -c conda-forge -c anaconda trim-galore=0.6.7 sra-tools=2.11.0 STAR htseq=1.99.2 subread=2.0.1 multiqc=1.11 snakemake=7.5.0 parallel-fastq-dump=0.6.7 bioconductor-tximport samtools=1.14 r-ggplot2 trinity=2.13.2 hisat2 bioconductor-qvalue sambamba graphviz gffread tpmcalculator lxml rsem fastp=0.23.2
+mamba install -c bioconda -c conda-forge -c anaconda tabulate=0.8.10 trim-galore=0.6.7 sra-tools=2.11.0 STAR htseq=1.99.2 subread=2.0.1 multiqc=1.11 snakemake=7.5.0 parallel-fastq-dump=0.6.7 bioconductor-tximport samtools=1.14 r-ggplot2 trinity=2.13.2 hisat2 bioconductor-qvalue sambamba graphviz gffread tpmcalculator lxml rsem fastp=0.23.2
 
 ```
 ### Configuration
