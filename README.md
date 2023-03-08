@@ -87,7 +87,7 @@ To add a reference genome to the pipeline download fasta and GFF3 files from an 
 mkdir ref && cd ref
 
 # Make sure file is unzipped
-gffread [GFF_file] -T -F --keep-exon-attrs -o [output_name].gtf
+gffread [GFF_file] -T -F --keep-exon-attrs -o [genome].gtf
 
 # Update config.json with the relative path to the GTF file
 #vim config.json
@@ -95,9 +95,9 @@ gffread [GFF_file] -T -F --keep-exon-attrs -o [output_name].gtf
 # Index the reference genome with STAR (make sure genome fasta is unzipped)
 # Helps to run on a compute cluster (computationally expensive)
 cd ref
-STAR  --runThreadN 48g --runMode genomeGenerate --genomeDir . --genomeFastaFiles [genome.fa] --sjdbGTFfile [reference.gtf] --sjdbOverhang 99   --genomeSAindexNbases 12
+STAR  --runThreadN 48 --runMode genomeGenerate --genomeDir . --genomeFastaFiles [genome.fa] --sjdbGTFfile [genome.gtf] --sjdbOverhang 99   --genomeSAindexNbases 12
 
-rsem-prepare-reference --gtf [genome.fa] [reference.gtf] [rsem_prep]
+rsem-prepare-reference --gtf [genome.fa] [genome.gtf] [rsem_prep]
 ```
 
 #### Workflow control file
