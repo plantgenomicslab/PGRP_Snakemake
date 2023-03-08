@@ -11,13 +11,14 @@ jobid = sys.argv[1]
 for i in range(STATUS_ATTEMPTS):
     try:
         time.sleep(2)
-        sacct_res = sp.check_output(shlex.split("sacct -P -b -j {} -n".format(jobid)))
+        sacct_res = sp.check_output(shlex.split("sacct -P  -o jobid,jobname,state,exitcode -j {} -n".format(jobid)))
         res = {
             x.split("|")[0]: x.split("|")[1]
             for x in sacct_res.decode().strip().split("\n")
         }
+        jobname = "my_job_name"  # define jobname variable
         with open("output.txt", "a") as f:
-            print('{} {} {}'.format(res, jobid, sacct_res), file=f)
+            print('{} {} {} {}'.format(res, jobid, jobname, sacct_res), file=f)
         break
     except sp.CalledProcessError as e:
         logger.error("sacct process error")

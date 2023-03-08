@@ -4,21 +4,31 @@ import pandas as pd
 
 # Load run and replicate information from the RunsbyExperiment.tsv input file (user must provide)
 SAMPLES_FILE = pd.read_csv("RunsbyExperiment.tsv", sep="\t")
+
+
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
+# create the Sample tab-delimited text file indicating biological replicate relationships
+#
+replicate_relationship= ""
+for index, row in SAMPLES_FILE.iterrows():
+    replicate_relationship += f"{row['Replicate']}\t{row['Sample']}\n"
+with open('replication_relationship.txt', 'w') as f:
+    f.write(replicate_relationship)
 
 # Load the config file as a dictionary
 cf = open("config.json")
 config_dict = json.load(cf)
+print(config_dict)
 cf.close()
 
 # Load deg_samples.txt for DEG calculation (user must provide)
-contrasts = os.path.exists("deg_samples.txt")
+contrasts = os.path.exists(config_dict["sample_contrast"])
 if config_dict["runDEG"] == "yes":
     if contrasts:
-        CONTRASTS_FILE = pd.read_csv("deg_samples.txt", sep="\t", header=None)
-        cTop = CONTRASTS_FILE.iloc[1][0]
-        cBottom = CONTRASTS_FILE.iloc[-1][0]
+        CONTRASTS_FILE = pd.read_csv(config_dict["sample_contrast"], sep="\t", header=None)
+        cTop = CONTRASTS_FILE.iloc[0][1]
+        cBottom = CONTRASTS_FILE.iloc[-1][1]
     else:
         cTop = ""
         cBottom = ""
@@ -99,10 +109,10 @@ rule all:
 
 rule importRaw:
     output: "output/{replicate}/raw/{replicate}_{pair}.fastq.gz"
-    message: "Importing raw data: cp " + config["rawInputDir"] + "/{wildcards.replicate}_{wildcards.pair}.fastq.gz {output}"
+    message: "Importing raw data: ln " + config["rawInputDir"] + "/{wildcards.replicate}_{wildcards.pair}.fastq.gz {output}"
     threads: config["threads"]["importRaw"]
     run:
-        shell("cp " + config["rawInputDir"] + "/{wildcards.replicate}_{wildcards.pair}.fastq.gz {output}")
+        shell("ln -s " + config["rawInputDir"] + "/{wildcards.replicate}_{wildcards.pair}.fastq.gz {output}")
 
 rule fastqc_raw:
     input:
@@ -123,18 +133,14 @@ rule trim:
         fwd_fastq = "output/{replicate}/raw/{replicate}" + PAIR_LIST[0] + ".fastq.gz",
         rev_fastq = "output/{replicate}/raw/{replicate}" + PAIR_LIST[1] + ".fastq.gz",
     output:
-        "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
-        "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
+        fwd_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
+        rev_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
     message: "-----Trimming {wildcards.replicate}-----"
     log: "output/{replicate}/logs/{replicate}_trim.log"
     threads: config["threads"]["trim"]
     run:
-        # Trim reads using TrimGalore
-        shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 5 \
-             --cores {threads} --max_n 40 --gzip -o output/{wildcards.replicate}/trim {input.fwd_fastq} {input.rev_fastq} \
-             2> {log}")
-        # Update filenames to improve MultiQC output format
-        shell("for file in output/{wildcards.replicate}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
+        # Trim reads using fastp
+        shell("fastp --detect_adapter_for_pe --overrepresentation_analysis --cut_right --thread {threads} --html output/{wildcards.replicate}/trim/{wildcards.replicate}.fastp.html --json output/{wildcards.replicate}/trim/{wildcards.replicate}.fastp.json -i {input.fwd_fastq} -I  {input.rev_fastq} -o {output.fwd_fastq} -O {output.rev_fastq} 2> {log}")
         # Run quality control on trimmed reads
         shell("fastqc --threads {threads} {output}")
 
@@ -149,16 +155,17 @@ rule alignSTAR:
     run:
         # Calculate run-level alignments to reference
         shell("STAR --runMode alignReads --runThreadN {threads} \
-                --outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
-		--quantMode TranscriptomeSAM GeneCounts \
-		--genomeDir " + config["genomeDir"]  + " \
-	        --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
-                --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.bam  \
+              --outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
+              --quantMode TranscriptomeSAM GeneCounts \
+              --genomeDir " + config["genomeDir"]  + " \
+              --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
+              --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.bam  \
 		2> {log}")
         # Perform check on output bam file to ensure it is not corrupted
         shell("echo '--------Checking {output}----------'")
         shell("set +e")
         shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
+        shell("samtools index -@ {threads} {output}")
 
 rule alignRSEM:
     input:
@@ -239,7 +246,7 @@ rule featureCounts:
 
 rule HTseq:
     message: "-----Generating raw counts (HTseq)-----"
-    input:expand("output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam", replicate=REPLICATE_LIST)
+    input: expand("output/{replicate}/bam/{replicate}.bamAligned.sortedByCoord.out.bam", replicate=REPLICATE_LIST)
     output: "output/counts/htseq/htseq-count.tsv"
     log: "output/counts/htseq/HTseq.log"
     threads: config["threads"]["HTseq"]
@@ -300,7 +307,7 @@ rule DEG_featureCounts:
     threads: config["threads"]["DEG_featureCounts"]
     run:
         # Compute differentially expressed genes based on deg_samples.txt
-        shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --replicates_file deg_samples.txt --output output/DEG")
+        shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
 
 rule DEG_HTseq:
     input:
@@ -312,7 +319,7 @@ rule DEG_HTseq:
     threads: config["threads"]["DEG_HTseq"]
     run:
         # Compute differentially expressed genes based on deg_samples.txt
-        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --replicates_file deg_samples.txt --output output/DEG")
+        shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["replication_relationship"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
 
 def input_DEG_RSEM(wildcards):
     inputs = expand("output/counts/RSEM/{replicate}.genes.results", replicate=REPLICATE_LIST)
@@ -328,7 +335,7 @@ rule DEG_RSEM:
         # Merge RESM output files into matrix
         shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
         # Compute differentially expressed genes based on deg_samples.txt
-        shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file deg_samples.txt --output output/DEG")
+        shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
 
 rule summarize:
     input: 
@@ -366,3 +373,4 @@ rule summarizeRSEM:
         # Summarize RSEM data
         shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_TPM.tsv")
         shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_FPKM.tsv")
+
