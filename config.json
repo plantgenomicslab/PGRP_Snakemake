@@ -24,7 +24,7 @@
   "replication_relationship":"replication_relationship.txt",
   "RSEM_prepared_genome":"ref/rsem_prep",
   "sra_dir":"/data/gpfs/assoc/pgl/johnny/ncbi/sra",
-  "GTFname":"ref/reference.gtf",
+  "GTFname":"ref/genome.gtf",
   "ref":[
     "ref/SA",
     "ref/SAindex",
