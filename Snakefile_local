@@ -315,12 +315,15 @@ rule DEG_featureCounts:
         featureCounts_subset = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
     message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG_featureCounts.log"
+    params::
+        replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+        matrix =  os.path.join(os.getcwd(), "output/counts/featureCounts/featureCount_clean.cnt")
     threads: config["threads"]["DEG_featureCounts"]
     run:
         # Compute differentially expressed genes based on deg_samples.txt
         shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
-        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/featureCounts/featureCounts.tpm.tsv -P 0.001 -C 2")
-        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/featureCounts/featureCounts.tpm.tsv -P 0.01 -C 1")
+        shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
+        shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 
 rule DEG_HTseq:
     input:
@@ -330,12 +333,15 @@ rule DEG_HTseq:
         HTSeq_subset =  "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
     message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG_HTseq.log"
+    params:
+         replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+         matrix =  os.path.join(os.getcwd(), "output/counts/htseq/htseq-count.tsv")
     threads: config["threads"]["DEG_HTseq"]
     run:
         # Compute differentially expressed genes based on deg_samples.txt
         shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["replication_relationship"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
-        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/htseq/htseq-count.tpm.tsv -P 0.001 -C 2")
-        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/htseq/htseq-count.tpm.tsv -P 0.01 -C 1")
+        shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
+        shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 
 def input_DEG_RSEM(wildcards):
     inputs = expand("output/counts/RSEM/{replicate}.genes.results", replicate=REPLICATE_LIST)
@@ -349,13 +355,16 @@ rule DEG_RSEM:
     message: "-------Calculating RSEM DEGs {output}---------"
     log: "output/DEG/DEG_RSEM.log"
     threads: config["threads"]["DEG_RSEM"]
+    params:
+        replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+        matrix =  os.path.join(os.getcwd(), "output/counts/RSEM/RSEM_TPM.tsv")
     run:
         # Merge RESM output files into matrix
         shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
         # Compute differentially expressed genes based on deg_samples.txt
         shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
-        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/RSEM/RSEM_TPM.tsv -P 0.001 -C 2")
-        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/RSEM/RSEM_TPM.tsv -P 0.01 -C 1")
+        shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
+        shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 rule summarize:
     input: 
         tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
