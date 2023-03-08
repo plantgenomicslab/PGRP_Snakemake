@@ -20,7 +20,7 @@
   },
   "rawInputDir":"/data/gpfs/assoc/pgl/data/John/Teff/final_genome_04292022/RNASeq/",
   "genomeDir":"ref/",
-  "sample_contrast":"samples_contrast.txt",
+  "sample_contrast":"sample_contrasts.txt",
   "replication_relationship":"replication_relationship.txt",
   "RSEM_prepared_genome":"ref/rsem_prep",
   "sra_dir":"/data/gpfs/assoc/pgl/johnny/ncbi/sra",

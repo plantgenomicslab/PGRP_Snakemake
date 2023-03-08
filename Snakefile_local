@@ -19,7 +19,7 @@ with open('replication_relationship.txt', 'w') as f:
 # Load the config file as a dictionary
 cf = open("config.json")
 config_dict = json.load(cf)
-print(config_dict)
+#print(config_dict)
 cf.close()
 
 # Load deg_samples.txt for DEG calculation (user must provide)
@@ -27,7 +27,7 @@ contrasts = os.path.exists(config_dict["sample_contrast"])
 if config_dict["runDEG"] == "yes":
     if contrasts:
         CONTRASTS_FILE = pd.read_csv(config_dict["sample_contrast"], sep="\t", header=None)
-        cTop = CONTRASTS_FILE.iloc[0][1]
+        cTop = CONTRASTS_FILE.iloc[-1][0]
         cBottom = CONTRASTS_FILE.iloc[-1][1]
     else:
         cTop = ""
@@ -98,9 +98,12 @@ def allInput():
     if config_dict["runDEG"] == "yes":
         if config_dict["readCounting"] == "RSEM":
             inputs.append("output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
+            inputs.append("output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset")
         else:
+            inputs.append("output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset")
             inputs.append("output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
             inputs.append("output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results")
+            inputs.append("output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset")
     return(inputs)
 
 rule all:
@@ -140,7 +143,14 @@ rule trim:
     threads: config["threads"]["trim"]
     run:
         # Trim reads using fastp
-        shell("fastp --detect_adapter_for_pe --overrepresentation_analysis --cut_right --thread {threads} --html output/{wildcards.replicate}/trim/{wildcards.replicate}.fastp.html --json output/{wildcards.replicate}/trim/{wildcards.replicate}.fastp.json -i {input.fwd_fastq} -I  {input.rev_fastq} -o {output.fwd_fastq} -O {output.rev_fastq} 2> {log}")
+        shell("fastp --detect_adapter_for_pe \
+        --overrepresentation_analysis \
+        --cut_right \
+        --thread {threads} \
+        --html output/{wildcards.replicate}/trim/{wildcards.replicate}.fastp.html \
+        --json output/{wildcards.replicate}/trim/{wildcards.replicate}.fastp.json \
+        -i {input.fwd_fastq} -I  {input.rev_fastq} \
+        -o {output.fwd_fastq} -O {output.rev_fastq} 2> {log}")
         # Run quality control on trimmed reads
         shell("fastqc --threads {threads} {output}")
 
@@ -301,25 +311,31 @@ rule DEG_featureCounts:
     input: 
         featureCounts = "output/counts/featureCounts/featureCount_clean.cnt"
     output: 
-        featureCounts = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results"
+        featureCounts = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
+        featureCounts_subset = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
     message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG_featureCounts.log"
     threads: config["threads"]["DEG_featureCounts"]
     run:
         # Compute differentially expressed genes based on deg_samples.txt
         shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/featureCounts/featureCounts.tpm.tsv -P 0.001 -C 2")
+        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/featureCounts/featureCounts.tpm.tsv -P 0.01 -C 1")
 
 rule DEG_HTseq:
     input:
         HTseq = "output/counts/htseq/htseq-count.tsv"
     output:
-        HTseq = "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results"
+        HTseq = "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
+        HTSeq_subset =  "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
     message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG_HTseq.log"
     threads: config["threads"]["DEG_HTseq"]
     run:
         # Compute differentially expressed genes based on deg_samples.txt
         shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["replication_relationship"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/htseq/htseq-count.tpm.tsv -P 0.001 -C 2")
+        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/htseq/htseq-count.tpm.tsv -P 0.01 -C 1")
 
 def input_DEG_RSEM(wildcards):
     inputs = expand("output/counts/RSEM/{replicate}.genes.results", replicate=REPLICATE_LIST)
@@ -327,7 +343,9 @@ def input_DEG_RSEM(wildcards):
 
 rule DEG_RSEM:
     input: input_DEG_RSEM
-    output: "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results"
+    output: 
+        "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
+        "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
     message: "-------Calculating RSEM DEGs {output}---------"
     log: "output/DEG/DEG_RSEM.log"
     threads: config["threads"]["DEG_RSEM"]
@@ -336,7 +354,8 @@ rule DEG_RSEM:
         shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
         # Compute differentially expressed genes based on deg_samples.txt
         shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
-
+        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/RSEM/RSEM_TPM.tsv -P 0.001 -C 2")
+        shell("analyze_diff_expr.pl --samples " + config_dict["replication_relationship"] + " --matrix output/counts/RSEM/RSEM_TPM.tsv -P 0.01 -C 1")
 rule summarize:
     input: 
         tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
