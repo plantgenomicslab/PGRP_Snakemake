@@ -315,7 +315,7 @@ rule DEG_featureCounts:
         featureCounts_subset = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
     message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG_featureCounts.log"
-    params::
+    params:
         replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
         matrix =  os.path.join(os.getcwd(), "output/counts/featureCounts/featureCount_clean.cnt")
     threads: config["threads"]["DEG_featureCounts"]
