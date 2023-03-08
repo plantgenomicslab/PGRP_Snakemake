@@ -96,6 +96,8 @@ gffread [GFF_file] -T -F --keep-exon-attrs -o [output_name].gtf
 # Helps to run on a compute cluster (computationally expensive)
 cd ref
 STAR  --runThreadN 48g --runMode genomeGenerate --genomeDir . --genomeFastaFiles [genome.fa] --sjdbGTFfile [reference.gtf] --sjdbOverhang 99   --genomeSAindexNbases 12
+
+rsem-prepare-reference --gtf [genome.fa] [reference.gtf] [rsem_prep]
 ```
 
 #### Workflow control file
