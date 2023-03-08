@@ -72,7 +72,7 @@
         },
 "alignRSEM":{
         "ncpus": 16,
-        "memory": "64g"
+        "memory": "128g"
         },
 "calculateRSEMExpression":{
         "ncpus": 16,
