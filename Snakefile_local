@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 # Load run and replicate information from the RunsbyExperiment.tsv input file (user must provide)
-SAMPLES_FILE = pd.read_csv("RunsbyExperiment.tsv", sep="\t")
+SAMPLES_FILE = pd.read_csv("RunsByExperiment.tsv", sep="\t")
 
 
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
@@ -12,7 +12,7 @@ REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
 #
 replicate_relationship= ""
 for index, row in SAMPLES_FILE.iterrows():
-    replicate_relationship += f"{row['Replicate']}\t{row['Sample']}\n"
+    replicate_relationship += f"{row['Sample']}\t{row['Replicate']}\n"
 with open('replication_relationship.txt', 'w') as f:
     f.write(replicate_relationship)
 
@@ -368,8 +368,8 @@ rule summarizeRSEM:
     message: "------ Summarizing RSEM ------"
     run:
         # Make RSEM tpm/fpkm matrices
-        shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM TPM")
-        shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM FPKM")
+        shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM TPM")
+        shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM FPKM")
         # Summarize RSEM data
         shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_TPM.tsv")
         shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_FPKM.tsv")
