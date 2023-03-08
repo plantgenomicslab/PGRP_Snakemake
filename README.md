@@ -99,15 +99,15 @@ STAR  --runThreadN 48g --runMode genomeGenerate --genomeDir . --genomeFastaFiles
 ```
 
 #### Workflow control file
-The pipeline requires the user to create a control file called ```RunsbyExperiment.tsv```. An examples of this file is provided in ```examples/```.
+The pipeline requires the user to create a control file called ```RunsByExperiment.tsv```. An examples of this file is provided in ```examples/```.
 
-```RunsbyExperiment.tsv``` provides the pipleline with information about the data that you want to process. These can be either SRA runs or locally stored data. When downloading SRA data, there may be multiple SRA runs (SRR...) for each SRA experiment (SRX...) where experiments represents the sequencing performed on a particular sample. Experiments should be given meainingful titles to aid in the interpretation of the pipeline output. Finally, the relationships between replicates and treatments should be flushed out.
+```RunsByExperiment.tsv``` provides the pipleline with information about the data that you want to process. These can be either SRA runs or locally stored data. When downloading SRA data, there may be multiple SRA runs (SRR...) for each SRA experiment (SRX...) where experiments represents the sequencing performed on a particular sample. Experiments should be given meainingful titles to aid in the interpretation of the pipeline output. Finally, the relationships between replicates and treatments should be flushed out.
 
 ```
 # Example format of RunsbyExperiment.tsv
 head sraRunsbyExperiment.tsv
 
-Run	Experiment	Replicate	Treatment
+Run	Experiment	Replicate	Sample
 SRR5210841	SRX2524297	ZT0_rep1	ZT0
 SRR5210842	SRX2524297	ZT0_rep1	ZT0
 SRR5210843	SRX2524297	ZT0_rep1	ZT0
@@ -133,10 +133,10 @@ Because these files can tedious to generate for projects with many samples, a sc
 If **running locally**, the 'Run' and 'Replicate' fields of ```RunsbyExperiment.tsv``` my be omitted. The 'Replicate' field should represent the prefixes of all fastq files to be included in the analysis. 'Treatment' then should be the desired name of the treatment to which each replicate belongs. Make sure to update ```config.json``` with the nomenclature for paired-ends. 
 
 #### DE control file
-Another optional control file called ```deg_samples.txt``` must be created if differential expression analysis is desired. If the file is missing then DE analysis will not be performed. ```deg_samples.txt``` provides tab separated contrasts to be used in differential gene expression analysis using DESeq2. The first column defines treatments and the second column defines replicates associated with each treatment. Pairwise differentially expressed genes will be computed for each combination of treatments. See ```example/``` for an example:
+Another optional control file called ```replication_relationship.txt``` must be created if differential expression analysis is desired. If the file is missing then DE analysis will not be performed. ```replication_relationship.txt``` provides tab separated contrasts to be used in differential gene expression analysis using DESeq2. The first column defines treatments and the second column defines replicates associated with each treatment. Pairwise differentially expressed genes will be computed for each combination of treatments. See ```example/``` for an example:
 
 ```
-# Example format of deg_samples.txt
+# Example format of replication_relationship.txt
 cat deg_samples.txt
 
 ZT0	ZT0_rep1
