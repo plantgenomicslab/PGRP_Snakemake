@@ -71,7 +71,8 @@ configfile: "config.json"
 def allInput():
     if config_dict["readCounting"] == "RSEM":
         inputs = ["output/counts/RSEM/RSEM_TPM.tsv.average.tsv",
-                "output/counts/RSEM/RSEM_TPM.tsv",]
+                "output/counts/RSEM/RSEM_TPM.tsv",
+                "output/counts/RSEM/RSEM_expected_count.tsv.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"]
     else:
         inputs = ["output/counts/featureCounts/featureCounts.cnt",
               "output/counts/htseq/htseq-count.tsv",
@@ -83,7 +84,9 @@ def allInput():
               "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv",
               "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
               "output/counts/htseq/htseq-count.tpm.tsv.average.tsv",
-              "output/counts/featureCounts/featureCount_clean.cnt"]
+              "output/counts/featureCounts/featureCount_clean.cnt",
+              "output/counts/htseq/htseq-count.tsv.minRow10.CPM.log2.centered.prcomp.principal_components.pdf",
+              "output/counts/featureCounts/featureCount_clean.cnt.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"]
     for replicate in REPLICATE_LIST:
         if config_dict["readCounting"] == "RSEM":
             inputs.append("output/" + replicate + "/bam/" + replicate + ".xs.bamAligned.toTranscriptome.out.bam")
@@ -312,7 +315,9 @@ rule DEG_featureCounts:
         featureCounts = "output/counts/featureCounts/featureCount_clean.cnt"
     output: 
         featureCounts = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
-        featureCounts_subset = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
+        featureCounts_subset = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
+        PtR = "output/counts/featureCounts/featureCount_clean.cnt.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"
+
     message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG_featureCounts.log"
     params:
@@ -324,13 +329,16 @@ rule DEG_featureCounts:
         shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
         shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
         shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
+        shell("cd output/counts/featureCounts && PtR --matrix featureCount_clean.cnt --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
 
 rule DEG_HTseq:
     input:
         HTseq = "output/counts/htseq/htseq-count.tsv"
     output:
         HTseq = "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
-        HTSeq_subset =  "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
+        HTSeq_subset =  "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
+        PtR = "output/counts/htseq/htseq-count.tsv.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"
+
     message: "-------Calculating DEGs {output}---------"
     log: "output/DEG/DEG_HTseq.log"
     params:
@@ -342,7 +350,7 @@ rule DEG_HTseq:
         shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["replication_relationship"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
         shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
         shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
-
+        shell("cd output/counts/htseq && PtR --matrix htseq-count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
 def input_DEG_RSEM(wildcards):
     inputs = expand("output/counts/RSEM/{replicate}.genes.results", replicate=REPLICATE_LIST)
     return(inputs)
@@ -351,7 +359,8 @@ rule DEG_RSEM:
     input: input_DEG_RSEM
     output: 
         "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
-        "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"
+        "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
+        "output/counts/RSEM/RSEM_expected_count.tsv.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"
     message: "-------Calculating RSEM DEGs {output}---------"
     log: "output/DEG/DEG_RSEM.log"
     threads: config["threads"]["DEG_RSEM"]
@@ -363,6 +372,7 @@ rule DEG_RSEM:
         shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
         # Compute differentially expressed genes based on deg_samples.txt
         shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+        shell("cd output/counts/RSEM && PtR --matrix RSEM_expected_count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
         shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
         shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 rule summarize:
