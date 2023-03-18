@@ -24,12 +24,13 @@ cf.close()
 
 # Load deg_samples.txt for DEG calculation (user must provide)
 contrasts = os.path.exists(config_dict["sample_contrast"])
-if config_dict["runDEG"] == "yes":
-    if contrasts:
+
+if config_dict.get("runDEG", "") == "yes":
+    try:
         CONTRASTS_FILE = pd.read_csv(config_dict["sample_contrast"], sep="\t", header=None)
         cTop = CONTRASTS_FILE.iloc[-1][0]
         cBottom = CONTRASTS_FILE.iloc[-1][1]
-    else:
+    except (FileNotFoundError, pd.errors.EmptyDataError):
         cTop = ""
         cBottom = ""
 else:
