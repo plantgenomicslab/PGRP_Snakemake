@@ -171,6 +171,7 @@ rule alignSTAR:
         shell("STAR --runMode alignReads --runThreadN {threads} \
               --outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
               --quantMode TranscriptomeSAM GeneCounts \
+              --outBAMsortingBinsN 200 \
               --genomeDir " + config["genomeDir"]  + " \
               --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
               --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.bam  \
@@ -193,6 +194,7 @@ rule alignRSEM:
         # Calculate run-level alignments to reference
         shell("STAR --runMode alignReads --runThreadN {threads} \
             --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+            --outBAMsortingBinsN 200 \
             --genomeDir " + config["genomeDir"]  + " \
             --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
             --outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
