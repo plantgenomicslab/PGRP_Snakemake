@@ -194,6 +194,7 @@ rule alignRSEM:
         # Calculate run-level alignments to reference
         shell("STAR --runMode alignReads --runThreadN {threads} \
             --outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+            --limitBAMsortRAM 20000000000 \
             --outBAMsortingBinsN 200 \
             --genomeDir " + config["genomeDir"]  + " \
             --readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
