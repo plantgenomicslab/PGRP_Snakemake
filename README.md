@@ -97,7 +97,7 @@ gffread [GFF_file] -T -F --keep-exon-attrs -o [genome].gtf
 cd ref
 STAR  --runThreadN 48 --runMode genomeGenerate --genomeDir . --genomeFastaFiles [genome.fa] --sjdbGTFfile [genome.gtf] --sjdbOverhang 99   --genomeSAindexNbases 12
 
-rsem-prepare-reference -p 48 --gtf [genome.fa] [genome.gtf] [rsem_prep]
+rsem-prepare-reference -p 48 --gtf [genome.gtf]  [genome.fa] [rsem_prep]
 ```
 
 #### Workflow control file
