@@ -15,6 +15,7 @@ try:
 except yaml.YAMLError as e:
 	sys.exit(f"Could not load config file! Check config.yml ...See error below:\n\n{e}")
 
+SOURCE = config["source"]
 LAYOUT = config["libraryType"] #TODO enable mixed library types
 if LAYOUT == "PAIRED":
 	PAIR_LIST = config["PAIR_LIST"]
@@ -49,7 +50,7 @@ else:
 # create the Sample tab-delimited text file indicating biological replicate relationships
 replicate_relationship= ""
 for index, row in SAMPLES_FILE.iterrows():
-	replicate_relationship += f"{row['Sample']}\t{row['Replicate']}\n"
+	replicate_relationship += f"{row['Treatment']}\t{row['Replicate']}\n"
 	with open('replication_relationship.txt', 'w') as f:
 		f.write(replicate_relationship)
 
@@ -73,7 +74,9 @@ for rep in REPLICATE_LIST:
 # Generate a list of all target output files
 def allInput():
 	inputs = []
-
+	rsem = False
+	star = False
+	
 	# Count and DEG files
 	if "RSEM" in config_dict["readCounting"]:
 		inputs += ["output/counts/RSEM/RSEM_TPM.tsv.average.tsv",
@@ -103,22 +106,26 @@ def allInput():
 					"output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv"]
 		
 	# Per-replicate data and processing files
-	for replicate in REPLICATE_LIST:
-		inputs.append("output/" + replicate + "/bam/" + replicate + ".bam")
-		
+	for replicate in REPLICATE_LIST:	
 		if "TPMcalculator" in config_dict["readCounting"]:
 			inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
+			star = True
 
 		if "RSEM" in config_dict["readCounting"]:
 			inputs.append("output/counts/RSEM/" + replicate + ".genes.results")
 			inputs.append("output/" + replicate + "/bam/" + replicate + ".RSEM.bam")
+			rsem = True
 		
-		if "featureCounts" in config_dict["readCounting"] or 
-				"HTseq" in config_dict["readCounting"] or 
-				"TPMcalculator" in config_dict["readCounting"]:
+		if ("featureCounts" in config_dict["readCounting"]) | ("HTseq" in config_dict["readCounting"]) | ("TPMcalculator" in config_dict["readCounting"]):
 				inputs.append("output/" + replicate + "/bam/" + replicate + ".STAR.bam")
+				star = True
 
 		for sample in REPLICATE_LOOKUP[replicate]:
+			if star:
+				inputs.append("output/" + replicate + "/" + sample + "/bam/" + sample + ".bamAligned.sortedByCoord.out.bam")
+			if rsem:
+				inputs.append("output/" + replicate + "/" + sample + "/bam/" + sample + ".xs.bamAligned.toTranscriptome.out.bam")
+
 			if LAYOUT == "PAIRED":
 				for pair in PAIR_LIST:
 					inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample  + pair + ".fastq.gz")
@@ -136,9 +143,21 @@ def allInput():
 if LAYOUT == "PAIRED":
 	ruleorder: align_PAIRED > align_SINGLE
 	ruleorder: alignRSEM_PAIRED > alignRSEM_SINGLE
+	ruleorder: calculateRSEMExpression_PAIRED > calculateRSEMExpression_SINGLE
+	ruleorder: trim_PAIRED > trim_SINGLE
+	if SOURCE == "local":
+		ruleorder: importRaw_PAIRED > convertSRAtoFastq_PAIRED
+	else:
+		ruleorder: convertSRAtoFastq_PAIRED > importRaw_PAIRED
 elif LAYOUT == "SINGLE":
 	ruleorder: align_SINGLE > align_PAIRED
 	ruleorder: alignRSEM_SINGLE > alignRSEM_PAIRED
+	ruleorder: calculateRSEMExpression_SINGLE > calculateRSEMExpression_PAIRED
+	ruleorder: trim_SINGLE > trim_PAIRED
+	if SOURCE == "local":
+		ruleorder: importRaw_SINGLE > convertSRAtoFastq_SINGLE
+	else:
+		ruleorder: convertSRAtoFastq_SINGLE > importRaw_SINGLE
 
 localrules: all, importRaw_PAIRED, importRaw_SINGLE
 
@@ -147,16 +166,19 @@ rule all:
 		allInput()
 
 rule importRaw_PAIRED:
-	output: "output/{replicate}/raw/{replicate}{pair}.fastq.gz"
-	message: "Importing raw data: ln " + config["rawInputDir"] + "/{wildcards.replicate}_{wildcards.pair}.fastq.gz {output}"
+	output: 
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
+	message: "Importing raw data: {wildcards.sample}"
 	run:
-		shell("ln -s " + config["rawInputDir"] + "/{wildcards.replicate}{wildcards.pair}.fastq.gz {output}")
+		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[0] + ".fastq.gz {output}")
+		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[1] + ".fastq.gz {output}")
 
 rule importRaw_SINGLE:
-	output: "output/{replicate}/raw/{replicate}.fastq.gz"
-	message: "Importing raw data: ln " + config["rawInputDir"] + "/{wildcards.replicate}.fastq.gz {output}"
+	output: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
+	message: "Importing raw data: {wildcards.sample}"
 	run:
-		shell("ln -s " + config["rawInputDir"] + "/{wildcards.replicate}.fastq.gz {output}")
+		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}.fastq.gz {output}")
 
 rule fetchSRA:
 	output: config["sra_dir"] + "/{sample}.sra" #"output/sra/{sample}.sra"
@@ -309,7 +331,7 @@ rule align_SINGLE:
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule alignRSEM_SINGLE:
-	input: "output/{replicate}/{sample}/trim/{sample}.fq.gz"
+	input: "output/{replicate}/{sample}/trim/{sample}_trimmed.fq.gz"
 	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
 	message: "-----Aligning for RSEM: {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
@@ -329,8 +351,8 @@ rule alignRSEM_SINGLE:
 
 rule alignRSEM_PAIRED:
 	input:
-		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
-		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
+		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + "_trimmed.fq.gz",
+		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + "_trimmed.fq.gz"
 	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
 	message: "-----Aligning for RSEM: {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
@@ -374,9 +396,8 @@ rule mergeRSEM:
 		shell("set +e")
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
-#TODO: Need to merge bam files from each run to calculate replicate-level expression
 rule calculateRSEMExpression_PAIRED:
-	input: "output/{replicate}/bam/{replicate}.bam"
+	input: "output/{replicate}/bam/{replicate}.RSEM.bam"
 	output: "output/counts/RSEM/{replicate}.genes.results"
 	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
 	threads: config["threads"]["calculateRSEMExpression"]
@@ -386,7 +407,7 @@ rule calculateRSEMExpression_PAIRED:
 
 #TODO: Need to merge bam files from each run to calculate replicate-level expression
 rule calculateRSEMExpression_SINGLE:
-	input: "output/{replicate}/bam/{replicate}.bam"
+	input: "output/{replicate}/bam/{replicate}.RSEM.bam"
 	output: "output/counts/RSEM/{replicate}.genes.results"
 	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
 	threads: config["threads"]["calculateRSEMExpression"]
@@ -421,7 +442,7 @@ rule mergeSTAR:
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule TPMCalculator:
-	input: "output/{replicate}/bam/{replicate}.bam"
+	input: "output/{replicate}/bam/{replicate}.STAR.bam"
 	output: "output/counts/tpmcalculator/{replicate}_genes.out"
 	message: "------- Calculating TPM --------"
 	#log: "output/counts/tpmcalculator/tpm-calculator.log"
@@ -446,7 +467,7 @@ rule mergeTPMCalculator:
 
 rule featureCounts:
 	message: "-----Generating raw counts (featureCounts)-----"
-	input: expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
+	input: expand("output/{replicate}/bam/{replicate}.STAR.bam", replicate=REPLICATE_LIST)
 	output: 
 		raw = "output/counts/featureCounts/featureCounts.cnt",
 		cleaned = "output/counts/featureCounts/featureCount_clean.cnt"
@@ -469,7 +490,7 @@ rule featureCounts:
 
 rule HTseq:
 	message: "-----Generating raw counts (HTseq)-----"
-	input:expand("output/{replicate}/bam/{replicate}.bam", replicate=REPLICATE_LIST)
+	input:expand("output/{replicate}/bam/{replicate}.STAR.bam", replicate=REPLICATE_LIST)
 	output: "output/counts/htseq/htseq-count.tsv"
 	log: "output/counts/htseq/HTseq.log"
 	threads: config["threads"]["HTseq"]
@@ -531,11 +552,11 @@ rule DEG_featureCounts:
 	log: "output/DEG/DEG_featureCounts.log"
 	threads: config["threads"]["DEG_featureCounts"]
 	params:
-		replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+		replication = os.path.join(os.getcwd(), config_dict["rep_relations"]),
 		matrix =  os.path.join(os.getcwd(), "output/counts/featureCounts/featureCount_clean.cnt")
 	run:
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["rep_relations"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 		shell("cd output/counts/featureCounts && PtR --matrix featureCount_clean.cnt --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
@@ -551,12 +572,12 @@ rule DEG_HTseq:
 	message: "-------Calculating DEGs {output}---------"
 	log: "output/DEG/DEG_HTseq.log"
 	params:
-		 replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+		 replication = os.path.join(os.getcwd(), config_dict["rep_relations"]),
 		 matrix =  os.path.join(os.getcwd(), "output/counts/htseq/htseq-count.tsv")
 	threads: config["threads"]["DEG_HTseq"]
 	run:
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["replication_relationship"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["rep_relations"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 		shell("cd output/counts/htseq && PtR --matrix htseq-count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
@@ -575,39 +596,46 @@ rule DEG_RSEM:
 	log: "output/DEG/DEG_RSEM.log"
 	threads: config["threads"]["DEG_RSEM"]
 	params:
-		replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+		replication = os.path.join(os.getcwd(), config_dict["rep_relations"]),
 		matrix =  os.path.join(os.getcwd(), "output/counts/RSEM/RSEM_TPM.tsv")
 	run:
 		# Merge RESM output files into matrix
 		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["rep_relations"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
 		shell("cd output/counts/RSEM && PtR --matrix RSEM_expected_count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 
-#TODO: Break out by software to allow different combos of counting software...
-rule summarize:
-	input: 
-		tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
-		featureCounts_TPM = "output/counts/featureCounts/featureCounts.tpm.tsv",
-		featureCounts_FPKM = "output/counts/featureCounts/featureCounts.fpkm.tsv",
-		HTseq_TPM = "output/counts/htseq/htseq-count.tpm.tsv",
-		HTseq_FPKM = "output/counts/htseq/htseq-count.fpkm.tsv"
-	output: 
-		"output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv",
-		"output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
-		"output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
+rule summarizeTPMCalc:
+	input: tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv"
+	output: "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv"
 	message: "--------------Summarizing Normalized Counts--------------"
 	run:
 		# Compute summary statistics (average/standard deviation) from TPMcalculator TPM values
 		shell("./scripts/summarizeNormalizedCounts.py Gene_Id {input.tpmcalc}")
-		# Compute summary statistics (average/standard deviation) from HTseq FPKM/TPM values
-		shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_TPM}")
-		shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_FPKM}")
-		# Compute summary statistics (average/standard deviation) from featureCounts FPKM/TPM values
-		shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
-		shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")
+
+rule summarizeHTseq:
+        input:
+                HTseq_TPM = "output/counts/htseq/htseq-count.tpm.tsv",
+                HTseq_FPKM = "output/counts/htseq/htseq-count.fpkm.tsv"
+        output: "output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
+        message: "--------------Summarizing HTseq--------------"
+        run:
+                # Compute summary statistics (average/standard deviation) from HTseq FPKM/TPM values
+                shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_TPM}")
+                shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_FPKM}")
+
+rule summarizeFeatureCounts:
+        input:
+                featureCounts_TPM = "output/counts/featureCounts/featureCounts.tpm.tsv",
+                featureCounts_FPKM = "output/counts/featureCounts/featureCounts.fpkm.tsv"
+        output: "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv"
+        message: "--------------Summarizing featureCounts--------------"
+        run:
+                # Compute summary statistics (average/standard deviation) from featureCounts FPKM/TPM values
+                shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
+                shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")
 
 rule summarizeRSEM:
 	input: input_DEG_RSEM
