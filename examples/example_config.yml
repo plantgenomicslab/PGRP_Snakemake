@@ -51,18 +51,18 @@ threads:
 #############################################################################################
 
 __default__:
-	account: placeholder    # Provide your slurm account
-	partition: placeholder  # Provide your slurm partition
-	memory: 8g
-	name: {rule}.{wildcards}
-	ncpus: 2
-	nodes: 1
-	time: 7-0:00:00
-	output: output/logs/{rule}.{wildcards}.out
-	error: output/logs/{rule}.{wildcards}.err
+  account: placeholder    # Provide your slurm account
+  partition: placeholder  # Provide your slurm partition
+  memory: 8g
+  name: {rule}.{wildcards}
+  ncpus: 2
+  nodes: 1
+  time: 7-0:00:00
+  output: output/logs/{rule}.{wildcards}.out
+  error: output/logs/{rule}.{wildcards}.err
 fetchSRA:
-	ncpus: 2
-	memory: 8g
+  ncpus: 2
+  memory: 8g
 importRaw_paired:
   ncpus: 2
   memory: 8g
@@ -115,8 +115,8 @@ merge:
   ncpus: 16
   memory: 64g
 featureCounts:
-	ncpus: 16
-	memory: 64g
+  ncpus: 16
+  memory: 64g
 HTseq:
   ncpus: 16
   memory: 64g

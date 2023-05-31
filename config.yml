@@ -13,12 +13,13 @@ genomeDir: placeholder                # (path) Reference genome directory
 GTF_name: placeholder                 # (path) Path to GTF file for STAR alignment
 ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
 
-readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
-RSEM_prepared_genome: placeholder     # (path) RSEM prepared reference genome...without extension (list includes RSEM)
+readCounting: [RSEM]                   # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
+RSEM_prepared_genome: placeholder      # (path) RSEM prepared reference genome...without extension (list includes RSEM)
 
-runDEG: yes                           # [yes|no] Whether to perform DEG analysis using Trinity
-                                      # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
-sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated 
+runDEG: yes                                 # [yes|no] Whether to perform DEG analysis using Trinity
+                                            # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
+sample_contrast: placeholder                # (path) DEG contrasts to perform. If not included, all contrasts are calculated 
+rep_relations: replication_relationship.txt # (path) Treatment/Replicate relationships file between. Created from RunsbyExperiment.tsv by default.
 
 #############################################################################################
 # Threads 
@@ -50,18 +51,18 @@ threads:
 #############################################################################################
 
 __default__:
-	account: placeholder    # Provide your slurm account
-	partition: placeholder  # Provide your slurm partition
-	memory: 8g
-	name: {rule}.{wildcards}
-	ncpus: 2
-	nodes: 1
-	time: 7-0:00:00
-	output: output/logs/{rule}.{wildcards}.out
-	error: output/logs/{rule}.{wildcards}.err
+  account: placeholder    # Provide your slurm account
+  partition: placeholder  # Provide your slurm partition
+  memory: 8g
+  name: "{rule}.{wildcards}"
+  ncpus: 2
+  nodes: 1
+  time: 7-0:00:00
+  output: output/logs/{rule}.{wildcards}.out
+  error: output/logs/{rule}.{wildcards}.err
 fetchSRA:
-	ncpus: 2
-	memory: 8g
+  ncpus: 2
+  memory: 8g
 importRaw_paired:
   ncpus: 2
   memory: 8g
@@ -117,8 +118,8 @@ merge:
   ncpus: 16
   memory: 64g
 featureCounts:
-	ncpus: 16
-	memory: 64g
+  ncpus: 16
+  memory: 64g
 HTseq:
   ncpus: 16
   memory: 64g
@@ -149,5 +150,3 @@ summarize:
 summarizeRSEM:
   ncpus: 2
   memory: 8g
-        
-
