@@ -4,21 +4,22 @@ import pandas as pd
 # Load run and sample information from the sraRunsbyExperiment.tsv input file (user must provide)
 SAMPLES_FILE = pd.read_csv("RunsbyExperiment.tsv", sep="\t")
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
-REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].values.tolist()))
+REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].tolist()))
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
 
 # Load configs
 configfile: "config.yml"
 try:
-	with open('config.yaml', "r") as config_file:
+	with open('config.yml', "r") as config_file:
 		config_dict = yaml.safe_load(config_file)
 except yaml.YAMLError as e:
-	logging.error("Could not load config file! Check config.yml ... see error below")
-	sys.exit(e)
+	sys.exit(f"Could not load config file! Check config.yml ...See error below:\n\n{e}")
 
 LAYOUT = config["libraryType"] #TODO enable mixed library types
 if LAYOUT == "PAIRED":
 	PAIR_LIST = config["PAIR_LIST"]
+else:
+	PAIR_LIST = ["_1", "_2"]
 
 # Check for an indexed reference genome or prepared genome for RSEM
 if "RSEM" in config_dict["readCounting"]:
@@ -41,8 +42,16 @@ if config_dict["runDEG"] == "yes":
 		cTop = ""
 		cBottom = ""
 else:
+	CONTRASTS_FILE = pd.DataFrame([["",""],["",""]])
 	cTop = ""
 	cBottom = ""
+
+# create the Sample tab-delimited text file indicating biological replicate relationships
+replicate_relationship= ""
+for index, row in SAMPLES_FILE.iterrows():
+	replicate_relationship += f"{row['Sample']}\t{row['Replicate']}\n"
+	with open('replication_relationship.txt', 'w') as f:
+		f.write(replicate_relationship)
 
 # Create sample output folders
 os.makedirs("output/logs/", exist_ok=True)
@@ -156,8 +165,8 @@ rule fetchSRA:
 rule convertSRAtoFastq_PAIRED:
 	input: config["sra_dir"] + "/{sample}.sra"
 	output: 
-		"output/{replicate}/{sample}/raw/{sample}{pair}.fastq.gz",
-		"output/{replicate}/{sample}/raw/{sample}{pair}.fastq.gz"
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
 	message: "-----Converting {wildcards.sample} SRA to Fastq files-----"
 	threads: config["threads"]["convertSRAtoFastq"]
 	log: "output/{replicate}/{sample}/logs/{sample}_fastqdump.log"
@@ -183,11 +192,11 @@ rule convertSRAtoFastq_SINGLE:
 
 rule fastqc_raw_PAIRED:
 	input:
-		"output/{replicate}/{sample}/raw/{sample}{pair}.fastq.gz",
-		"output/{replicate}/{sample}/raw/{sample}{pair}.fastq.gz"
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
 	output:
-		"output/{replicate}/{sample}/raw/{sample}{pair}_fastqc.zip",
-		"output/{replicate}/{sample}/raw/{sample}{pair}_fastqc.zip"
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + "_fastqc.zip",
+		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + "_fastqc.zip"
 	message: "-----Running Fastqc_raw {wildcards.sample}-----"
 	threads: config["threads"]["fastqc_raw"]
 	log: "output/{replicate}/{sample}/logs/{sample}_raw_fastqc.log"
@@ -207,11 +216,11 @@ rule fastqc_raw_SINGLE:
 
 rule trim_PAIRED:
 	input:
-		fwd_fastq = "output/{replicate}/{sample}/raw/{sample}{pair}.fastq.gz",
-		rev_fastq = "output/{replicate}/{sample}/raw/{sample}{pair}.fastq.gz"
+		fwd_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+		rev_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
 	output:
-		"output/{replicate}/{sample}/trim/{sample}{pair}.fq.gz",
-		"output/{replicate}/{sample}/trim/{sample}{pair}.fq.gz"
+		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
+		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
 	message: "-----Trimming {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
 	threads: config["threads"]["trim"]
@@ -241,8 +250,8 @@ rule trim_SINGLE:
 
 rule align_PAIRED:
 	input:
-		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}{pair}.fq.gz",
-		rev_fastq = "output/{replicate}/{sample}/trim/{sample}{pair}.fq.gz"
+		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
+		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
 	output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
 	message: "-----Aligning {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_align.log"
