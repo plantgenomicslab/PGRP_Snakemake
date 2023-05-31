@@ -114,7 +114,10 @@ calculateRSEMExpression_SINGLE:
 calculateRSEMExpression_PAIRED:
   ncpus: 16
   memory: 64g
-merge:
+mergeSTAR:
+  ncpus: 16
+  memory: 64g
+mergeRSEM:
   ncpus: 16
   memory: 64g
 featureCounts:
