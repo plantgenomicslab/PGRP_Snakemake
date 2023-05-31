@@ -43,7 +43,6 @@ threads:
   DEG_featureCounts: 8
   DEG_HTseq: 8
   DEG_RSEM: 8
-  summarize: 2
 
 #############################################################################################
 # Cluster
@@ -102,13 +101,16 @@ align_SINGLE:
 align_PAIRED:
   ncpus: 16
   memory: 64g
-alignSTAR:
+alignRSEM_PAIRED:
   ncpus: 16
   memory: 64g
-alignRSEM:
+alignRSEM_SINGLE:
   ncpus: 16
-  memory: 128g
-calculateRSEMExpression:
+  memory: 64g
+calculateRSEMExpression_SINGLE:
+  ncpus: 16
+  memory: 64g
+calculateRSEMExpression_PAIRED:
   ncpus: 16
   memory: 64g
 merge:

@@ -118,8 +118,10 @@ def allInput():
 
 if LAYOUT == "PAIRED":
 	ruleorder: align_PAIRED > align_SINGLE
+	ruleorder: alignRSEM_PAIRED > alignRSEM_SINGLE
 elif LAYOUT == "SINGLE":
 	ruleorder: align_SINGLE > align_PAIRED
+	ruleorder: alignRSEM_SINGLE > alignRSEM_PAIRED
 
 localrules: all, importRaw_PAIRED, importRaw_SINGLE
 
@@ -279,6 +281,64 @@ rule align_SINGLE:
 		shell("set +e")
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
+rule alignRSEM_SINGLE:
+	input: "output/{replicate}/trim/{replicate}.fq.gz"
+	output:"output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
+	message: "-----Aligning for RSEM: {wildcards.replicate}-----"
+	log: "output/{replicate}/logs/{replicate}_alignRSEM.log"
+	threads: config["threads"]["align"]
+	run:
+		# Calculate run-level alignments to reference
+		shell("STAR --runMode alignReads --runThreadN {threads} \
+			--outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+			--limitBAMsortRAM 20000000000 \
+			--outBAMsortingBinsN 200 \
+			--genomeDir " + config["genomeDir"]  + " \
+			--readFilesCommand gunzip -c --readFilesIn {input} \
+			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
+			--quantTranscriptomeBan IndelSoftclipSingleend  \
+			--alignEndsType EndToEnd  \
+			--outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.xs.bam")
+
+rule alignRSEM_PAIRED:
+	input:
+		fwd_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
+		rev_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
+	output:"output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
+	message: "-----Aligning for RSEM: {wildcards.replicate}-----"
+	log: "output/{replicate}/logs/{replicate}_alignRSEM.log"
+	threads: config["threads"]["align"]
+	run:
+		# Calculate run-level alignments to reference
+		shell("STAR --runMode alignReads --runThreadN {threads} \
+			--outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
+			--limitBAMsortRAM 20000000000 \
+			--outBAMsortingBinsN 200 \
+			--genomeDir " + config["genomeDir"]  + " \
+			--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
+			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
+			--quantTranscriptomeBan IndelSoftclipSingleend  \
+			--alignEndsType EndToEnd  \
+			--outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.xs.bam")
+
+rule calculateRSEMExpression_PAIRED:
+	input: "output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
+	output: "output/counts/RSEM/{replicate}.genes.results"
+	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
+	threads: config["threads"]["calculateRSEMExpression"]
+	run:
+		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
+			--paired-end {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
+
+rule calculateRSEMExpression_SINGLE:
+	input: "output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
+	output: "output/counts/RSEM/{replicate}.genes.results"
+	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
+	threads: config["threads"]["calculateRSEMExpression"]
+	run:
+		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
+			 {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
+
 def mergeInput(wildcards):
 	inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
 	return(inputs)
@@ -429,6 +489,31 @@ rule DEG_HTseq:
 		# Compute differentially expressed genes based on contrasts.txt
 		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
 
+def input_DEG_RSEM(wildcards):
+	inputs = expand("output/counts/RSEM/{replicate}.genes.results", replicate=REPLICATE_LIST)
+	return(inputs)
+
+rule DEG_RSEM:
+	input: input_DEG_RSEM
+	output: 
+		"output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
+		"output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
+		"output/counts/RSEM/RSEM_expected_count.tsv.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"
+	message: "-------Calculating RSEM DEGs {output}---------"
+	log: "output/DEG/DEG_RSEM.log"
+	threads: config["threads"]["DEG_RSEM"]
+	params:
+		replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+		matrix =  os.path.join(os.getcwd(), "output/counts/RSEM/RSEM_TPM.tsv")
+	run:
+		# Merge RESM output files into matrix
+		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
+		# Compute differentially expressed genes based on deg_samples.txt
+		shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("cd output/counts/RSEM && PtR --matrix RSEM_expected_count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
+
 rule summarize:
 	input: 
 		tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
@@ -441,7 +526,6 @@ rule summarize:
 		"output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
 		"output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
 	message: "--------------Summarizing Normalized Counts--------------"
-	threads: config["threads"]["summarize"]
 	run:
 		# Compute summary statistics (average/standard deviation) from TPMcalculator TPM values
 		shell("./scripts/summarizeNormalizedCounts.py Gene_Id {input.tpmcalc}")
@@ -451,3 +535,17 @@ rule summarize:
 		# Compute summary statistics (average/standard deviation) from featureCounts FPKM/TPM values
 		shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
 		shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")
+
+rule summarizeRSEM:
+	input: input_DEG_RSEM
+	output: 
+		"output/counts/RSEM/RSEM_TPM.tsv.average.tsv",
+		"output/counts/RSEM/RSEM_TPM.tsv"
+	message: "------ Summarizing RSEM ------"
+	run:
+		# Make RSEM tpm/fpkm matrices
+		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM TPM")
+		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM FPKM")
+		# Summarize RSEM data
+		shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_TPM.tsv")
+		shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_FPKM.tsv")
