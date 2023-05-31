@@ -108,9 +108,17 @@ def allInput():
 		
 		if "TPMcalculator" in config_dict["readCounting"]:
 			inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
+
+		if "RSEM" in config_dict["readCounting"]:
+			inputs.append("output/counts/RSEM/" + replicate + ".genes.results")
+			inputs.append("output/" + replicate + "/bam/" + replicate + ".RSEM.bam")
 		
+		if "featureCounts" in config_dict["readCounting"] or 
+				"HTseq" in config_dict["readCounting"] or 
+				"TPMcalculator" in config_dict["readCounting"]:
+				inputs.append("output/" + replicate + "/bam/" + replicate + ".STAR.bam")
+
 		for sample in REPLICATE_LOOKUP[replicate]:
-			inputs.append("output/" + replicate + "/" + sample + "/bam/" + sample + ".bamAligned.sortedByCoord.out.bam")
 			if LAYOUT == "PAIRED":
 				for pair in PAIR_LIST:
 					inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample  + pair + ".fastq.gz")
@@ -202,7 +210,7 @@ rule fastqc_raw_PAIRED:
 	log: "output/{replicate}/{sample}/logs/{sample}_raw_fastqc.log"
 	run:
 		# Run quality control on raw reads
-		shell("fastqc --threads {threads} {input} 2> {log}")
+		shell("fastqc --threads {threads} {input} --outdir output/{wildcards.replicate}/{wildcards.sample}/raw/ 2> {log}")
 
 rule fastqc_raw_SINGLE:
 	input: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
@@ -212,7 +220,7 @@ rule fastqc_raw_SINGLE:
 	log: "output/{replicate}/{sample}/logs/{sample}_raw_fastqc.log"
 	run:
 		# Run quality control on raw reads
-		shell("fastqc --threads {threads} {input} 2> {log}")
+		shell("fastqc --threads {threads} {input} --outdir output/{wildcards.replicate}/{wildcards.sample}/raw/ 2> {log}")
 
 rule trim_PAIRED:
 	input:
@@ -225,14 +233,17 @@ rule trim_PAIRED:
 	log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
 	threads: config["threads"]["trim"]
 	run:
-		# Trim reads using TrimGalore
-		shell("trim_galore --paired --three_prime_clip_R1 5 --three_prime_clip_R2 5 \
-			 --cores {threads} --max_n 40 --gzip -o output/{wildcards.replicate}/{wildcards.sample}/trim {input.fwd_fastq} {input.rev_fastq} \
-			 2> {log}")
-		# Update filenames to improve MultiQC output format
-		shell("for file in output/{wildcards.replicate}/{wildcards.sample}/trim/*_val_*; do mv $file $(echo $file | sed s/_val_[0-9]//); done")
+		# Trim reads using fastp
+		shell("fastp --detect_adapter_for_pe \
+		--overrepresentation_analysis \
+		--cut_right \
+		--thread {threads} \
+		--html output/{wildcards.replicate}/{wildcards.sample}/trim/{wildcards.sample}.fastp.html \
+		--json output/{wildcards.replicate}/{wildcards.sample}/trim/{wildcards.sample}.fastp.json \
+		-i {input.fwd_fastq} -I  {input.rev_fastq} \
+		-o {output.fwd_fastq} -O {output.rev_fastq} 2> {log}")
 		# Run quality control on trimmed reads
-		shell("fastqc --threads {threads} {output}")
+		shell("fastqc --threads {threads} {output} --outdir output/{wildcards.replicate}/{wildcards.sample}/trim 2> {log}")
 
 rule trim_SINGLE:
 	input: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
@@ -241,12 +252,17 @@ rule trim_SINGLE:
 	log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
 	threads: config["threads"]["trim"]
 	run:
-		# Trim reads using TrimGalore
-		shell("trim_galore --three_prime_clip_R1 5 \
-			   --cores {threads} --max_n 40 --gzip -o output/{wildcards.replicate}/{wildcards.sample}/trim {input} \
-			   2> {log}")
+		# Trim reads using fastp
+		shell("fastp  \
+		--overrepresentation_analysis \
+		--cut_right \
+		--thread {threads} \
+		--html output/{wildcards.replicate}/{wildcards.sample}/trim/{wildcards.sample}.fastp.html \
+		--json output/{wildcards.replicate}/{wildcards.sample}/trim/{wildcards.sample}.fastp.json \
+		-i {input} \
+		-o {output} 2> {log}")
 		# Run quality control on trimmed reads
-		shell("fastqc --threads {threads} {output}")
+		shell("fastqc --threads {threads} {output} --outdir output/{wildcards.replicate}/{wildcards.sample}/trim 2> {log}")
 
 rule align_PAIRED:
 	input:
@@ -260,11 +276,12 @@ rule align_PAIRED:
 		# Calculate run-level alignments to reference
 		shell("STAR --runMode alignReads --runThreadN {threads} \
 				--outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
-		--quantMode TranscriptomeSAM GeneCounts \
-		--genomeDir " + config["genomeDir"]  + " \
-			--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
+				--quantMode TranscriptomeSAM GeneCounts \
+				--outBAMsortingBinsN 200 \
+				--genomeDir " + config["genomeDir"]  + " \
+				--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
 				--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
-		2> {log}")
+				2> {log}")
 		# Perform check on output bam file to ensure it is not corrupted
 		shell("echo '--------Checking {output}----------'")
 		shell("set +e")
@@ -279,22 +296,23 @@ rule align_SINGLE:
 	run:
 		# Calculate run-level alignments to reference
 		shell("STAR --runMode alignReads --runThreadN {threads} \
-			   --outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
-		   --quantMode TranscriptomeSAM GeneCounts \
-			   --genomeDir " + config["genomeDir"]  + " \
-			   --readFilesCommand gunzip -c --readFilesIn {input} \
-			   --outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
-			   2> {log}")
+				--outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
+				--quantMode TranscriptomeSAM GeneCounts \
+				--outBAMsortingBinsN 200 \
+				--genomeDir " + config["genomeDir"]  + " \
+				--readFilesCommand gunzip -c --readFilesIn {input} \
+				--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
+				2> {log}")
 		# Perform check on output bam file to ensure it is not corrupted
 		shell("echo '--------Checking {output}----------'")
 		shell("set +e")
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule alignRSEM_SINGLE:
-	input: "output/{replicate}/trim/{replicate}.fq.gz"
-	output:"output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
-	message: "-----Aligning for RSEM: {wildcards.replicate}-----"
-	log: "output/{replicate}/logs/{replicate}_alignRSEM.log"
+	input: "output/{replicate}/{sample}/trim/{sample}.fq.gz"
+	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
+	message: "-----Aligning for RSEM: {wildcards.sample}-----"
+	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
 	threads: config["threads"]["align"]
 	run:
 		# Calculate run-level alignments to reference
@@ -307,15 +325,15 @@ rule alignRSEM_SINGLE:
 			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
 			--quantTranscriptomeBan IndelSoftclipSingleend  \
 			--alignEndsType EndToEnd  \
-			--outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.xs.bam")
+			--outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.xs.bam")
 
 rule alignRSEM_PAIRED:
 	input:
-		fwd_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[0] + ".fq.gz",
-		rev_fastq = "output/{replicate}/trim/{replicate}" + PAIR_LIST[1] + ".fq.gz"
-	output:"output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
-	message: "-----Aligning for RSEM: {wildcards.replicate}-----"
-	log: "output/{replicate}/logs/{replicate}_alignRSEM.log"
+		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
+		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
+	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
+	message: "-----Aligning for RSEM: {wildcards.sample}-----"
+	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
 	threads: config["threads"]["align"]
 	run:
 		# Calculate run-level alignments to reference
@@ -328,33 +346,15 @@ rule alignRSEM_PAIRED:
 			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
 			--quantTranscriptomeBan IndelSoftclipSingleend  \
 			--alignEndsType EndToEnd  \
-			--outFileNamePrefix output/{wildcards.replicate}/bam/{wildcards.replicate}.xs.bam")
+			--outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.xs.bam")
 
-rule calculateRSEMExpression_PAIRED:
-	input: "output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
-	output: "output/counts/RSEM/{replicate}.genes.results"
-	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
-	threads: config["threads"]["calculateRSEMExpression"]
-	run:
-		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
-			--paired-end {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
-
-rule calculateRSEMExpression_SINGLE:
-	input: "output/{replicate}/bam/{replicate}.xs.bamAligned.toTranscriptome.out.bam"
-	output: "output/counts/RSEM/{replicate}.genes.results"
-	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
-	threads: config["threads"]["calculateRSEMExpression"]
-	run:
-		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
-			 {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
-
-def mergeInput(wildcards):
-	inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
+def mergeInputRSEM(wildcards):
+	inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
 	return(inputs)
 
-rule merge:
-	input: mergeInput
-	output: "output/{replicate}/bam/{replicate}.bam"
+rule mergeRSEM:
+	input: mergeInputRSEM
+	output: "output/{replicate}/bam/{replicate}.RSEM.bam"
 	message: "-----Merging bam files by experiment-----"
 	log: "output/{replicate}/bam/{replicate}_merge.log"
 	threads: config["threads"]["merge"]
@@ -367,7 +367,53 @@ rule merge:
 			shell("samtools index {output}") 
 		else:
 			# Only 1 run in a sample, add it to sample-level output
-			shell("cp {input} {output}")
+			shell("ln -s {input} {output}")
+			print("1 run per sample...skipping BAM merge")
+		# Perform check on output bam file to ensure it is not corrupted
+		shell("echo '--------Checking {output}----------'")
+		shell("set +e")
+		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
+
+#TODO: Need to merge bam files from each run to calculate replicate-level expression
+rule calculateRSEMExpression_PAIRED:
+	input: "output/{replicate}/bam/{replicate}.bam"
+	output: "output/counts/RSEM/{replicate}.genes.results"
+	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
+	threads: config["threads"]["calculateRSEMExpression"]
+	run:
+		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
+			--paired-end {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
+
+#TODO: Need to merge bam files from each run to calculate replicate-level expression
+rule calculateRSEMExpression_SINGLE:
+	input: "output/{replicate}/bam/{replicate}.bam"
+	output: "output/counts/RSEM/{replicate}.genes.results"
+	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
+	threads: config["threads"]["calculateRSEMExpression"]
+	run:
+		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
+			 {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
+
+def mergeInputSTAR(wildcards):
+	inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
+	return(inputs)
+
+rule mergeSTAR:
+	input: mergeInputSTAR
+	output: "output/{replicate}/bam/{replicate}.STAR.bam"
+	message: "-----Merging bam files by experiment-----"
+	log: "output/{replicate}/bam/{replicate}_merge.log"
+	threads: config["threads"]["merge"]
+	run:
+		# note: bam files must be sorted in same manner prior to merge
+		if len(REPLICATE_LOOKUP[wildcards.replicate]) > 1:
+			# Merge bam files from same sample
+			shell("samtools merge --threads {threads} -o {output} {input}") 
+			# Create bam index folder for HTseq
+			shell("samtools index {output}") 
+		else:
+			# Only 1 run in a sample, add it to sample-level output
+			shell("ln -s {input} {output}")
 			print("1 run per sample...skipping BAM merge")
 		# Perform check on output bam file to ensure it is not corrupted
 		shell("echo '--------Checking {output}----------'")
@@ -433,7 +479,7 @@ rule HTseq:
 				 --format bam \
 				 --order pos \
 				 --mode union \
-		 --stranded=no \
+				--stranded=no \
 				 --type exon \
 				 --idattr gene_id \
 				 --nprocesses {threads} \
@@ -478,25 +524,42 @@ rule DEG_featureCounts:
 	input: 
 		featureCounts = "output/counts/featureCounts/featureCount_clean.cnt"
 	output: 
-		featureCounts = "output/DEG/featureCount_clean.cnt." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
+		featureCounts = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
+		featureCounts_subset = "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
+		PtR = "output/counts/featureCounts/featureCount_clean.cnt.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"
 	message: "-------Calculating DEGs {output}---------"
 	log: "output/DEG/DEG_featureCounts.log"
 	threads: config["threads"]["DEG_featureCounts"]
+	params:
+		replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+		matrix =  os.path.join(os.getcwd(), "output/counts/featureCounts/featureCount_clean.cnt")
 	run:
-		# Compute differentially expressed genes based on contrasts.txt
-		shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+		# Compute differentially expressed genes based on deg_samples.txt
+		shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["replication_relationship"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
+		shell("cd output/counts/featureCounts && PtR --matrix featureCount_clean.cnt --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
+
 
 rule DEG_HTseq:
 	input:
 		HTseq = "output/counts/htseq/htseq-count.tsv"
 	output:
-		HTseq = "output/DEG/htseq-count.tsv." + CONTRASTS_FILE.iloc[1][0]  + "_vs_" + CONTRASTS_FILE.iloc[-1][0]  + ".DESeq2.DE_results"
+		HTseq = "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
+		HTSeq_subset =  "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
+		PtR = "output/counts/htseq/htseq-count.tsv.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"
 	message: "-------Calculating DEGs {output}---------"
 	log: "output/DEG/DEG_HTseq.log"
+	params:
+		 replication = os.path.join(os.getcwd(), config_dict["replication_relationship"]),
+		 matrix =  os.path.join(os.getcwd(), "output/counts/htseq/htseq-count.tsv")
 	threads: config["threads"]["DEG_HTseq"]
 	run:
-		# Compute differentially expressed genes based on contrasts.txt
-		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file contrasts.txt --output output/DEG")
+		# Compute differentially expressed genes based on deg_samples.txt
+		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["replication_relationship"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
+		shell("cd output/counts/htseq && PtR --matrix htseq-count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
 
 def input_DEG_RSEM(wildcards):
 	inputs = expand("output/counts/RSEM/{replicate}.genes.results", replicate=REPLICATE_LIST)
@@ -523,6 +586,7 @@ rule DEG_RSEM:
 		shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 
+#TODO: Break out by software to allow different combos of counting software...
 rule summarize:
 	input: 
 		tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv",
