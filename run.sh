@@ -3,8 +3,8 @@
 set -x
 set -e
 
-snakemake -p --rerun-incomplete --cluster-config config/cluster.json \
-		--snakefile Snakefile_SRA \
+snakemake -p --rerun-incomplete --cluster-config config.yml \
+		--snakefile Snakefile \
         --max-jobs-per-second 50 \
 		--max-status-checks-per-second 50 \
 		--jobs 150 \

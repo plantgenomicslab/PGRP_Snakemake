@@ -1,0 +1,151 @@
+#############################################################################################
+# Inputs
+# Configuration required
+#############################################################################################
+source: local                         # [local|sra] whether RNAseq data is stored locally or should be fetched from SRA
+rawInputDir: placeholder              # (path) path to local RNAseq data directory (source=local)
+sra_dir: placeholder                  # (path) path to sra directory... see README (source=sra)
+
+libraryType: PAIRED                   # [PAIRED|SINGLE] RNAseq library type
+PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read files (libraryType=PAIRED)
+
+genomeDir: placeholder                # (path) Reference genome directory
+GTF_name: placeholder                 # (path) Path to GTF file for STAR alignment
+ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
+
+readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
+RSEM_prepared_genome: placeholder     # (path) RSEM prepared reference genome...without extension (list includes RSEM)
+
+runDEG: yes                           # [yes|no] Whether to perform DEG analysis using Trinity
+                                      # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
+sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated 
+
+#############################################################################################
+# Threads 
+# Configuration optional
+#############################################################################################
+
+threads:
+  importRaw: 2
+  fetchSRA: 2
+  convertSRAtoFastq: 8
+  fastqc_raw: 2
+  trim: 16
+  align: 16
+  calculateRSEMExpression: 16
+  merge: 16
+  featureCount: 16
+  HTseq: 16
+  normalizeFeatureCounts: 2
+  normalizeHTseq: 2
+  TPMCalculator: 8
+  mergeTPMCalculator: 2
+  DEG_featureCounts: 8
+  DEG_HTseq: 8
+  DEG_RSEM: 8
+  summarize: 2
+
+#############################################################################################
+# Cluster
+# Configuration required
+#############################################################################################
+
+__default__:
+	account: placeholder    # Provide your slurm account
+	partition: placeholder  # Provide your slurm partition
+	memory: 8g
+	name: {rule}.{wildcards}
+	ncpus: 2
+	nodes: 1
+	time: 7-0:00:00
+	output: output/logs/{rule}.{wildcards}.out
+	error: output/logs/{rule}.{wildcards}.err
+fetchSRA:
+	ncpus: 2
+	memory: 8g
+importRaw_paired:
+  ncpus: 2
+  memory: 8g
+importRaw_single:
+  ncpus: 2
+  memory: 8g
+convertSRAtoFastq_SINGLE:
+  ncpus: 8
+  memory: 64g
+convertSRAtoFastq_PAIRED:
+  ncpus: 8
+  memory: 64g
+fastqc_raw_SINGLE:
+  ncpus: 2
+  memory: 8g
+fastqc_raw_PAIRED:
+  ncpus: 2
+  memory: 8g
+fastqc_raw:
+  ncpus: 2
+  memory: 8g
+trim_SINGLE:
+  ncpus: 16
+  memory: 64g
+trim_PAIRED:
+  ncpus: 16
+  memory: 64g
+fastqc_trim_SINGLE:
+  ncpus: 2
+  memory: 8g
+fastqc_trim_PAIRED:
+  ncpus: 2
+  memory: 8g
+align_SINGLE:
+  ncpus: 16
+  memory: 64g
+align_PAIRED:
+  ncpus: 16
+  memory: 64g
+alignSTAR:
+  ncpus: 16
+  memory: 64g
+alignRSEM:
+  ncpus: 16
+  memory: 128g
+calculateRSEMExpression:
+  ncpus: 16
+  memory: 64g
+merge:
+  ncpus: 16
+  memory: 64g
+featureCounts:
+	ncpus: 16
+	memory: 64g
+HTseq:
+  ncpus: 16
+  memory: 64g
+normalizeFeatureCounts:
+  ncpus: 2
+  memory: 8g
+normalizeHTseq:
+  ncpus: 2
+  memory: 8g
+TPMCalculator:
+  ncpus: 8
+  memory: 64g
+mergeTPMCalculator:
+  ncpus: 2
+  memory: 8g
+DEG_featureCounts:
+  ncpus: 8
+  memory: 64g
+DEG_HTseq:
+  ncpus: 8
+  memory: 64g
+DEG_RSEM:
+  ncpus: 8
+  memory: 64g
+summarize:
+  ncpus: 2
+  memory: 8g
+summarizeRSEM:
+  ncpus: 2
+  memory: 8g
+        
+
