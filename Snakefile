@@ -389,7 +389,7 @@ rule mergeRSEM:
 			shell("samtools index {output}") 
 		else:
 			# Only 1 run in a sample, add it to sample-level output
-			shell("ln -s {input} {output}")
+			shell("ln -s --relative {input} {output}")
 			print("1 run per sample...skipping BAM merge")
 		# Perform check on output bam file to ensure it is not corrupted
 		shell("echo '--------Checking {output}----------'")
@@ -645,8 +645,8 @@ rule summarizeRSEM:
 	message: "------ Summarizing RSEM ------"
 	run:
 		# Make RSEM tpm/fpkm matrices
-		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM TPM")
-		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM FPKM")
+		shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM TPM")
+		shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM FPKM")
 		# Summarize RSEM data
 		shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_TPM.tsv")
 		shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_FPKM.tsv")
