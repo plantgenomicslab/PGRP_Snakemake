@@ -3,22 +3,22 @@
 # Configuration required
 #############################################################################################
 source: local                         # [local|sra] whether RNAseq data is stored locally or should be fetched from SRA
-rawInputDir: placeholder              # (path) path to local RNAseq data directory (source=local)
+rawInputDir: /data/gpfs/assoc/jlomas/carot-raw-fastq-20studies              # (path) path to local RNAseq data directory (source=local)
 sra_dir: placeholder                  # (path) path to sra directory... see README (source=sra)
 
-libraryType: PAIRED                   # [PAIRED|SINGLE] RNAseq library type
+libraryType: SINGLE                   # [PAIRED|SINGLE] RNAseq library type
 PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read files (libraryType=PAIRED)
 
-genomeDir: placeholder                # (path) Reference genome directory
-GTF_name: placeholder                 # (path) Path to GTF file for STAR alignment
+genomeDir: /data/gpfs/assoc/pgl/johnny/Carot_Annotation_Analysis/Dcarota_388_v2.0                # (path) Reference genome directory
+GTF_name: /data/gpfs/assoc/pgl/johnny/Carot_Annotation_Analysis/Dcarota_388_v2.0/Dcarota_388_v2.0.gene_exons.gtf                 # (path) Path to GTF file for STAR alignment
 ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
 
-readCounting: [RSEM]                   # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
-RSEM_prepared_genome: placeholder      # (path) RSEM prepared reference genome...without extension (list includes RSEM)
+readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
+RSEM_prepared_genome: /data/gpfs/assoc/pgl/johnny/Carot_Annotation_Analysis/Dcarota_388_v2.0/Dcarota_388_v2    # (path) RSEM prepared reference genome...without extension (list includes RSEM)
 
-runDEG: yes                                 # [yes|no] Whether to perform DEG analysis using Trinity
-                                            # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
-sample_contrast: placeholder                # (path) DEG contrasts to perform. If not included, all contrasts are calculated 
+runDEG: no                           # [yes|no] Whether to perform DEG analysis using Trinity
+                                      # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
+sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated
 rep_relations: replication_relationship.txt # (path) Treatment/Replicate relationships file between. Created from RunsbyExperiment.tsv by default.
 
 #############################################################################################
@@ -51,8 +51,8 @@ threads:
 #############################################################################################
 
 __default__:
-  account: placeholder    # Provide your slurm account
-  partition: placeholder  # Provide your slurm partition
+  account: cpu-s1-pgl-0    # Provide your slurm account
+  partition: cpu-s1-pgl-0  # Provide your slurm partition
   memory: 8g
   name: "{rule}.{wildcards}"
   ncpus: 2
