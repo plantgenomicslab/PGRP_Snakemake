@@ -34,7 +34,7 @@ for ref in config_dict["ref"]:
 # Configure DEG calculation (user must provide)
 #TODO: write better method for identifying DEG contrasts output files. Maybe 'checkpoint'?
 contrasts = os.path.exists(config_dict["sample_contrast"])
-if config_dict["runDEG"] == "yes":
+if config_dict["runDEG"]:
 	try:
 		CONTRASTS_FILE = pd.read_csv(config_dict["sample_contrast"], sep="\t", header=None)
 		cTop = CONTRASTS_FILE.iloc[-1][0]
@@ -80,30 +80,30 @@ def allInput():
 	# Count and DEG files
 	if "RSEM" in config_dict["readCounting"]:
 		inputs += ["output/counts/RSEM/RSEM_TPM.tsv.average.tsv",
-					"output/counts/RSEM/RSEM_TPM.tsv"]
-		if config_dict["runDEG"] == "yes":
+			   "output/counts/RSEM/RSEM_TPM.tsv"]
+		if config_dict["runDEG"]:
 			inputs += ["output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
-						"output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"]
+				   "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"]
 	if "featureCounts" in config_dict["readCounting"]:
 		inputs += ["output/counts/featureCounts/featureCounts.cnt",
-					"output/counts/featureCounts/featureCounts.tpm.tsv",
-					"output/counts/featureCounts/featureCounts.fpkm.tsv",
-					"output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
-					"output/counts/featureCounts/featureCount_clean.cnt"]
-		if config_dict["runDEG"] == "yes":
+			   "output/counts/featureCounts/featureCounts.tpm.tsv",
+			   "output/counts/featureCounts/featureCounts.fpkm.tsv",
+			   "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
+			   "output/counts/featureCounts/featureCount_clean.cnt"]
+		if config_dict["runDEG"]:
 			inputs += ["output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
-						"output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results"]
+				   "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results"]
 	if "HTseq" in config_dict["readCounting"]:
 		inputs += ["output/counts/htseq/htseq-count.tsv",
-					"output/counts/htseq/htseq-count.tpm.tsv",
-					"output/counts/htseq/htseq-count.fpkm.tsv",
-					"output/counts/htseq/htseq-count.tpm.tsv.average.tsv"]
-		if config_dict["runDEG"] == "yes":
+			   "output/counts/htseq/htseq-count.tpm.tsv",
+			   "output/counts/htseq/htseq-count.fpkm.tsv",
+			   "output/counts/htseq/htseq-count.tpm.tsv.average.tsv"]
+		if config_dict["runDEG"]:
 			inputs += ["output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
-						"output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"]
+				   "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"]
 	if "TPMcalculator" in config_dict["readCounting"]:
 		inputs += ["output/counts/tpmcalculator/tpmcalculator-merged.tsv",
-					"output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv"]
+			   "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv"]
 		
 	# Per-replicate data and processing files
 	for replicate in REPLICATE_LIST:	
@@ -130,7 +130,7 @@ def allInput():
 				for pair in PAIR_LIST:
 					inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample  + pair + ".fastq.gz")
 					inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample  + pair + "_fastqc.zip")
-					inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + pair + ".fq.gz")
+					inputs.append("output/" + replicate + "/" + sample + "/trim/" + sample + pair + "_trimmed.fq.gz")
 			elif LAYOUT == "SINGLE":
 				inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + ".fastq.gz")
 				inputs.append("output/" + replicate + "/" + sample + "/raw/" + sample + "_fastqc.zip")
@@ -145,6 +145,9 @@ if LAYOUT == "PAIRED":
 	ruleorder: alignRSEM_PAIRED > alignRSEM_SINGLE
 	ruleorder: calculateRSEMExpression_PAIRED > calculateRSEMExpression_SINGLE
 	ruleorder: trim_PAIRED > trim_SINGLE
+	ruleorder: convertSRAtoFastq_PAIRED > convertSRAtoFastq_SINGLE
+	ruleorder: importRaw_PAIRED > importRaw_SINGLE
+	ruleorder: fastqc_raw_PAIRED > fastqc_raw_SINGLE
 	if SOURCE == "local":
 		ruleorder: importRaw_PAIRED > convertSRAtoFastq_PAIRED
 	else:
@@ -154,6 +157,9 @@ elif LAYOUT == "SINGLE":
 	ruleorder: alignRSEM_SINGLE > alignRSEM_PAIRED
 	ruleorder: calculateRSEMExpression_SINGLE > calculateRSEMExpression_PAIRED
 	ruleorder: trim_SINGLE > trim_PAIRED
+	ruleorder: convertSRAtoFastq_SINGLE > convertSRAtoFastq_PAIRED
+	ruleorder: importRaw_SINGLE > importRaw_PAIRED
+	ruleorder: fastqc_raw_SINGLE > fastqc_raw_PAIRED
 	if SOURCE == "local":
 		ruleorder: importRaw_SINGLE > convertSRAtoFastq_SINGLE
 	else:
@@ -167,12 +173,12 @@ rule all:
 
 rule importRaw_PAIRED:
 	output: 
-		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
-		"output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
+		one = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
+		two = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
 	message: "Importing raw data: {wildcards.sample}"
 	run:
-		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[0] + ".fastq.gz {output}")
-		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[1] + ".fastq.gz {output}")
+		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[0] + ".fastq.gz {output.one}")
+		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[0] + ".fastq.gz {output.two}")
 
 rule importRaw_SINGLE:
 	output: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
@@ -249,8 +255,8 @@ rule trim_PAIRED:
 		fwd_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
 		rev_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
 	output:
-		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
-		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
+		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + "_trimmed.fq.gz",
+		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + "_trimmed.fq.gz"
 	message: "-----Trimming {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
 	threads: config["threads"]["trim"]
@@ -288,8 +294,8 @@ rule trim_SINGLE:
 
 rule align_PAIRED:
 	input:
-		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + ".fq.gz",
-		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + ".fq.gz"
+		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + "_trimmed.fq.gz",
+		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + "_trimmed.fq.gz"
 	output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
 	message: "-----Aligning {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_align.log"
@@ -588,22 +594,22 @@ def input_DEG_RSEM(wildcards):
 
 rule DEG_RSEM:
 	input: input_DEG_RSEM
-	output: 
-		"output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
+	output: "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
 		"output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
 		"output/counts/RSEM/RSEM_expected_count.tsv.minRow10.CPM.log2.centered.prcomp.principal_components.pdf"
 	message: "-------Calculating RSEM DEGs {output}---------"
 	log: "output/DEG/DEG_RSEM.log"
 	threads: config["threads"]["DEG_RSEM"]
 	params:
-		replication = os.path.join(os.getcwd(), config_dict["rep_relations"]),
-		matrix =  os.path.join(os.getcwd(), "output/counts/RSEM/RSEM_TPM.tsv")
+		rep_relations = os.path.join(os.getcwd(), config_dict["rep_relations"]),
+		matrix =  os.path.join(os.getcwd(), "output/counts/RSEM/RSEM_expected_count.tsv"),
+		sample_contrast = os.path.join(os.getcwd(),config_dict["sample_contrast"])
 	run:
 		# Merge RESM output files into matrix
 		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix output/counts/RSEM/RSEM_expected_count.tsv --method DESeq2 --samples_file " + config_dict["rep_relations"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
-		shell("cd output/counts/RSEM && PtR --matrix RSEM_expected_count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
+		shell("run_DE_analysis.pl --matrix {params.matrix} --method DESeq2 --samples_file {params.rep_relations} --contrasts {sample_contrast} --output output/DEG")
+		shell("cd output/counts/RSEM && PtR --matrix {params.matrix} --min_rowSums 10 -s {params.rep_relations} --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 
