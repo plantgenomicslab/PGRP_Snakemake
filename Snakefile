@@ -606,12 +606,12 @@ rule DEG_RSEM:
 		sample_contrast = os.path.join(os.getcwd(),config_dict["sample_contrast"])
 	run:
 		# Merge RESM output files into matrix
-		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
+		shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM expected_count")
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix {params.matrix} --method DESeq2 --samples_file {params.rep_relations} --contrasts {sample_contrast} --output output/DEG")
+		shell("run_DE_analysis.pl --matrix {params.matrix} --method DESeq2 --samples_file {params.rep_relations} --contrasts {params.sample_contrast} --output output/DEG")
 		shell("cd output/counts/RSEM && PtR --matrix {params.matrix} --min_rowSums 10 -s {params.rep_relations} --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
-		shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
-		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples  {params.rep_relations} --matrix {params.matrix} -P 0.001 -C 2")
+		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.rep_relations} --matrix {params.matrix} -P 0.01 -C 1")
 
 rule summarizeTPMCalc:
 	input: tpmcalc = "output/counts/tpmcalculator/tpmcalculator-merged.tsv"
