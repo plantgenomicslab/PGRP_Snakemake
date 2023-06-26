@@ -178,7 +178,7 @@ rule importRaw_PAIRED:
 	message: "Importing raw data: {wildcards.sample}"
 	run:
 		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[0] + ".fastq.gz {output.one}")
-		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[0] + ".fastq.gz {output.two}")
+		shell("ln -s " + config["rawInputDir"] + "/{wildcards.sample}" + PAIR_LIST[1] + ".fastq.gz {output.two}")
 
 rule importRaw_SINGLE:
 	output: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
@@ -255,8 +255,8 @@ rule trim_PAIRED:
 		fwd_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[0] + ".fastq.gz",
 		rev_fastq = "output/{replicate}/{sample}/raw/{sample}" + PAIR_LIST[1] + ".fastq.gz"
 	output:
-		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + "_trimmed.fq.gz",
-		"output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + "_trimmed.fq.gz"
+		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + "_trimmed.fq.gz",
+		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + "_trimmed.fq.gz"
 	message: "-----Trimming {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_trim.log"
 	threads: config["threads"]["trim"]
