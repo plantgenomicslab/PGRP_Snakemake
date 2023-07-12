@@ -1,15 +1,15 @@
 # PGRP_Snakemake
 ## Introduction
 
-The PGRP_Snakemake pipeline provides an efficient and modular workflow for processing RNA sequencing data from multiple sources. The workflow allows users to go from downloading raw data to differential expression analysis in a single run. Additionally, the pipeline can utilize raw sequencing reads directly from [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra) or from local storage. 
+The PGRP_Snakemake pipeline provides an efficient and modular workflow for processing RNA sequencing data from multiple sources. The workflow provides users with a complete and distributed pipeline from downloading raw data to differential expression analysis. The pipeline can utilize raw sequencing reads directly from [NCBI SRA](https://www.ncbi.nlm.nih.gov/sra) or from local storage and is compatable with paired- or single-end libraries.
 
 **Pipeline overview:**
 - Download fastq from SRA (SRA Toolkit)
 - Quality control on raw reads (FastQC)
-- Trimming (Trim Galore)
+- Trimming (fastp)
 - Quality control on trimmed reads (FastQC)
 - Map reads to reference (STAR)
-- Count reads (HTseq/FeatureCounts/TPMcalculator)
+- Count reads (RSEM/HTseq/FeatureCounts/TPMcalculator)
 - Normalize counts TPM/FPKM (custom scripts)
 - Summary statistics of normalized counts (custom scripts)
 - Differential expression analysis (Trinity/DESeq2)
@@ -76,40 +76,40 @@ vdb-config  -i --interactive-mode textual
 vdb-config -s /http/timeout/read=100000
 ```
 
-### Input Files
-#### Reference genome
-The pipeline requires an indexed reference genome and GTF file as input. By default, the pipeline expects the reference genome and gtf file to be located in the ```ref/``` directory. You can either create a directory called 'ref' to store the reference genome and GTF file or update config.json to use a different location for the reference materials.
-
-To add a reference genome to the pipeline download fasta and GFF3 files from an appropriate source. Then:
+## Input Files
+### Reference genome
+The pipeline requires an indexed reference genome and GTF file as input. To add a reference genome to the pipeline download fasta and GFF3 files from an appropriate source. Then:
 
 ```bash
-# Add the ref directory to your working directory
-mkdir ref && cd ref
-
 # Make sure file is unzipped
 gffread [GFF_file] -T -F --keep-exon-attrs -o [genome].gtf
 
-# Update config.json with the relative path to the GTF file
+# Update config.json with the relative path to the GTF file and the reference folder
 #vim config.json
 
 # Index the reference genome with STAR (make sure genome fasta is unzipped)
 # Helps to run on a compute cluster (computationally expensive)
-cd ref
-STAR  --runThreadN 48 --runMode genomeGenerate --genomeDir . --genomeFastaFiles [genome.fa] --sjdbGTFfile [genome.gtf] --sjdbOverhang 99   --genomeSAindexNbases 12
+STAR  --runThreadN 48 \
+  --runMode genomeGenerate \
+  --genomeDir . \
+  --genomeFastaFiles [genome.fa] \
+  --sjdbGTFfile [genome.gtf] \
+  --sjdbOverhang 99 \
+  --genomeSAindexNbases 12
 
-rsem-prepare-reference -p 48 --gtf [genome.gtf]  [genome.fa] [rsem_prep]
+# If using RSEM, prepare the reference 
+rsem-prepare-reference -p 48 --gtf [genome.gtf] [genome.fa] [rsem_prep]
 ```
 
-#### Workflow control file
+### Workflow control file
 The pipeline requires the user to create a control file called ```RunsByExperiment.tsv```. An examples of this file is provided in ```examples/```.
 
-```RunsByExperiment.tsv``` provides the pipleline with information about the data that you want to process. These can be either SRA runs or locally stored data. When downloading SRA data, there may be multiple SRA runs (SRR...) for each SRA experiment (SRX...) where experiments represents the sequencing performed on a particular sample. Experiments should be given meainingful titles to aid in the interpretation of the pipeline output. Finally, the relationships between replicates and treatments should be flushed out.
+```RunsByExperiment.tsv``` provides the pipleline with information about the data that you want to process. These can be either SRA runs or locally stored data. When downloading SRA data, there may be multiple SRA runs (SRR...) for each SRA experiment (SRX...) where experiments represents the sequencing performed on a particular sample. Experiments should be given meainingful titles to aid in the interpretation of the pipeline output. Finally, the relationships between replicates and treatments should be flushed out for count aggregation and DEG analysis.
 
 ```
 # Example format of RunsbyExperiment.tsv
-head sraRunsbyExperiment.tsv
 
-Run	Experiment	Replicate	Sample
+Run	Experiment	Replicate	Treatment
 SRR5210841	SRX2524297	ZT0_rep1	ZT0
 SRR5210842	SRX2524297	ZT0_rep1	ZT0
 SRR5210843	SRX2524297	ZT0_rep1	ZT0
@@ -132,9 +132,9 @@ Because these files can tedious to generate for projects with many samples, a sc
 ./scripts/joinSraRelations.py SRP098160 ".*" ".*"
 ```
 
-If **running locally**, the 'Run' and 'Replicate' fields of ```RunsbyExperiment.tsv``` my be omitted. The 'Replicate' field should represent the prefixes of all fastq files to be included in the analysis. 'Treatment' then should be the desired name of the treatment to which each replicate belongs. Make sure to update ```config.json``` with the nomenclature for paired-ends. 
+If **running locally**, the 'Run' and 'Experiment' fields of ```RunsbyExperiment.tsv``` may be omitted. The 'Replicate' field should represent the prefixes of all fastq files to be included in the analysis. 'Treatment' then should be the desired name of the treatment to which each replicate belongs. Make sure to update ```config.json``` with the nomenclature for paired-ends. 
 
-#### DE control file
+#### DE control files
 Another optional control file called ```replication_relationship.txt``` must be created if differential expression analysis is desired. If the file is missing then DE analysis will not be performed. ```replication_relationship.txt``` provides tab separated contrasts to be used in differential gene expression analysis using DESeq2. The first column defines treatments and the second column defines replicates associated with each treatment. Pairwise differentially expressed genes will be computed for each combination of treatments. See ```example/``` for an example:
 
 ```
@@ -154,41 +154,30 @@ ZT8	ZT8_rep3
 
 ## Running the pipeline 
 
-Separate snakefiles are provided for running from the SRA and from local data, namely ```Snakefile_SRA``` and ```Snakefile_local```. To run on SLURM there are also separate shell scripts for each option, ```run_SRA.sh``` and ```run_local```. Make sure to use the correct workflow for your analysis.
-
 ### Running without scheduler
 ```bash
 # Check the pipeline prior to run
-snakemake --snakefile [Snakemake_local|Snakemake_SRA] -np
+snakemake --snakefile Snakefile -np
 
 # Visualize the pipeline as a DAG
-snakemake --snakefile [Snakemake_local|Snakemake_SRA] \
+snakemake --snakefile Snakefile \
           --dag [output] | \
           dot -Tpdf -Gnodesep=0.75 -Granksep=0.75 > dag.pdf
 
 # Run the pipeline 
-snakemake --snakefile [Snakemake_local|Snakemake_SRA] \
+snakemake --snakefile Snakefile \
           --cores [available cores]
 ```
 
 ### Running with SLURM scheduler
 
 ```bash
-# Running from sra
 sbatch --mem=4g \
        -c 2 \
        --time=13-11:00:00 \
        -o snakemake.out \
        -e snakemake.err \
-       --wrap="./run_SRA.sh"
-
-# Running from local
-sbatch --mem=4g \
-       -c 2 \
-       --time=13-11:00:00 \
-       -o snakemake.out \
-       -e snakemake.err \
-       --wrap="./run_local.sh"
+       --wrap="./run.sh"
 ```
 
 ## Citations
