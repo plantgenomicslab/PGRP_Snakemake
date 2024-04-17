@@ -9,17 +9,17 @@ sra_dir: placeholder                  # (path) path to sra directory... see READ
 libraryType: SINGLE                   # [PAIRED|SINGLE] RNAseq library type
 PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read files (libraryType=PAIRED)
 
-genomeDir: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref
-GTF_name: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf
+genomeDir: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref # Base genome folder
+GTF_name: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf # location of gtf file
 ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
-RSEM_prepared_genome: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref
+RSEM_prepared_genome: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/rsem_prep # PATH and prefix of RSEM reference
 
 runDEG: no                           # [yes|no] Whether to perform DEG analysis using Trinity
                                       # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
-sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated
-rep_relations: replication_relationship.txt # (path) Treatment/Replicate relationships file between. Created from RunsbyExperiment.tsv by default.
+sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated. Example is in ./example folder
+rep_relations: replication_relationship.txt  # (path of replication_relationship.txt) Treatment/Replicate relationships file between. Created from RunsbyExperiment.tsv by default.
 
 #############################################################################################
 # Threads 
