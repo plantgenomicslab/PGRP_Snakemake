@@ -3,18 +3,18 @@
 # Configuration required
 #############################################################################################
 source: local                         # [local|sra] whether RNAseq data is stored locally or should be fetched from SRA
-rawInputDir: /data/gpfs/assoc/jlomas/carot-raw-fastq-20studies              # (path) path to local RNAseq data directory (source=local)
+rawInputDir: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/bam # (path) path to local RNAseq data directory (source=local)
 sra_dir: placeholder                  # (path) path to sra directory... see README (source=sra)
 
 libraryType: SINGLE                   # [PAIRED|SINGLE] RNAseq library type
 PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read files (libraryType=PAIRED)
 
-genomeDir: /data/gpfs/assoc/pgl/johnny/Carot_Annotation_Analysis/Dcarota_388_v2.0                # (path) Reference genome directory
-GTF_name: /data/gpfs/assoc/pgl/johnny/Carot_Annotation_Analysis/Dcarota_388_v2.0/Dcarota_388_v2.0.gene_exons.gtf                 # (path) Path to GTF file for STAR alignment
+genomeDir: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref
+GTF_name: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf
 ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
-RSEM_prepared_genome: /data/gpfs/assoc/pgl/johnny/Carot_Annotation_Analysis/Dcarota_388_v2.0/Dcarota_388_v2    # (path) RSEM prepared reference genome...without extension (list includes RSEM)
+RSEM_prepared_genome: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref
 
 runDEG: no                           # [yes|no] Whether to perform DEG analysis using Trinity
                                       # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
