@@ -58,7 +58,7 @@ mamba install -c bioconda -c conda-forge -c anaconda tabulate=0.8.10 trim-galore
 
 Add ```config.json``` to the repo. This file controls various inputs to the workflow and must be updated by the user. A template for ```config.json``` is availble in the ```example/``` directory. 
 ```
-cd .../PGRP_Snakemake
+cd ../PGRP_Snakemake
 cp example/example_config.json config.json
 ```
 
@@ -105,6 +105,8 @@ rsem-prepare-reference -p 48 --gtf [genome.gtf] [genome.fa] [rsem_prep]
 The pipeline requires the user to create a control file called ```RunsByExperiment.tsv```. An examples of this file is provided in ```examples/```.
 
 ```RunsByExperiment.tsv``` provides the pipleline with information about the data that you want to process. These can be either SRA runs or locally stored data. When downloading SRA data, there may be multiple SRA runs (SRR...) for each SRA experiment (SRX...) where experiments represents the sequencing performed on a particular sample. Experiments should be given meainingful titles to aid in the interpretation of the pipeline output. Finally, the relationships between replicates and treatments should be flushed out for count aggregation and DEG analysis.
+
+For local analysis ```scripts/Experiment_name_composer.py``` script takes an input folder and an optional output file name as command-line arguments. It generates a list of sample names from files with specific extensions in the input folder, removes any _rep* or _Rep* suffixes from the sample names, and creates an output file with columns for Run, Replicate, and Sample. The Run and Replicate columns contain the original sample name, while the Sample column contains the cleaned sample name without the _rep* or _Rep* suffix.
 
 ```
 # Example format of RunsbyExperiment.tsv
