@@ -1,8 +1,8 @@
 import yaml, sys, os
 import pandas as pd
 
-# Load run and sample information from the sraRunsbyExperiment.tsv input file (user must provide)
-SAMPLES_FILE = pd.read_csv("RunsbyExperiment.tsv", sep="\t")
+# Load run and sample information from the sraRunsByExperiment.tsv input file (user must provide)
+SAMPLES_FILE = pd.read_csv("RunsByExperiment.tsv", sep="\t")
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].tolist()))
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
@@ -606,7 +606,7 @@ rule DEG_RSEM:
 		sample_contrast = os.path.join(os.getcwd(),config_dict["sample_contrast"])
 	run:
 		# Merge RESM output files into matrix
-		shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM expected_count")
+		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
 		# Compute differentially expressed genes based on deg_samples.txt
 		shell("run_DE_analysis.pl --matrix {params.matrix} --method DESeq2 --samples_file {params.rep_relations} --contrasts {params.sample_contrast} --output output/DEG")
 		shell("cd output/counts/RSEM && PtR --matrix {params.matrix} --min_rowSums 10 -s {params.rep_relations} --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
@@ -651,8 +651,8 @@ rule summarizeRSEM:
 	message: "------ Summarizing RSEM ------"
 	run:
 		# Make RSEM tpm/fpkm matrices
-		shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM TPM")
-		shell("python ./scripts/makeRSEMMatrix.py RunsbyExperiment.tsv output/counts/RSEM FPKM")
+		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM TPM")
+		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM FPKM")
 		# Summarize RSEM data
 		shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_TPM.tsv")
 		shell("./scripts/summarizeNormalizedCounts.py gene_id output/counts/RSEM/RSEM_FPKM.tsv")
