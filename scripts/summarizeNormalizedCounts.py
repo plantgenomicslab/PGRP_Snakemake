@@ -13,7 +13,7 @@ COUNTS_FILE = sys.argv[2]
 counts = pd.read_csv(COUNTS_FILE, sep="\t", index_col=gene_index)
 
 SAMPLES_FILE = pd.read_csv("RunsByExperiment.tsv", sep="\t")
-REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Treatment")['Replicate'].unique().apply(list).to_dict()
+REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Sample")['Replicate'].unique().apply(list).to_dict()
 
 averages = pd.DataFrame()
 stdDevs = pd.DataFrame()
