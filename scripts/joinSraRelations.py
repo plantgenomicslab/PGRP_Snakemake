@@ -26,4 +26,4 @@ experiments['Treatment'] = experiments['Replicate'].str.extract(r'(' +sys.argv[3
 
 joined = pd.merge(runs, experiments, on="Experiment")
 
-joined.to_csv("RunsbyExperiment.tsv", sep="\t", index=False)
+joined.to_csv("RunsByExperiment.tsv", sep="\t", index=False)

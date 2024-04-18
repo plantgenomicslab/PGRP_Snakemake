@@ -12,7 +12,7 @@ gene_index = sys.argv[1]
 COUNTS_FILE = sys.argv[2]
 counts = pd.read_csv(COUNTS_FILE, sep="\t", index_col=gene_index)
 
-SAMPLES_FILE = pd.read_csv("RunsbyExperiment.tsv", sep="\t")
+SAMPLES_FILE = pd.read_csv("RunsByExperiment.tsv", sep="\t")
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Treatment")['Replicate'].unique().apply(list).to_dict()
 
 averages = pd.DataFrame()
