@@ -36,7 +36,7 @@ def generate_input_data(input_folder):
 input_data = generate_input_data(input_folder)
 
 # define output file headers
-headers = ['Run', 'Replicate', 'Sample']
+headers = ['Run', 'Replicate', 'Treatment']
 
 # define function to create output rows
 def create_output_rows(input_data):
