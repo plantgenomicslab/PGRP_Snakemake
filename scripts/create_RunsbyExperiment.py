@@ -27,7 +27,7 @@ if __name__ == "__main__":
     df = create_table(args.directory)
     df.sort_values(by=['Run'], inplace=True)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    df.to_csv(f'RunsByExperiment_{timestamp}.txt', sep='\t', index=False)
+    df.to_csv(f'RunsByExperiment_{timestamp}.tsv', sep='\t', index=False)
 
     # Pairwise comparisons for sample contrast
     #pairwise_df = pd.DataFrame(list(combinations(df['experiment'], 2)), columns=['Sample1', 'Sample2'])
@@ -38,4 +38,4 @@ if __name__ == "__main__":
     pairwise_df = pd.DataFrame(pairwise_combinations, columns=['Sample1', 'Sample2'])
     pairwise_df = pairwise_df[pairwise_df['Sample1'] != pairwise_df['Sample2']]
     pairwise_df.sort_values(by=['Sample1', 'Sample2'], inplace=True)
-    pairwise_df.to_csv(f'sample_contrasts_{timestamp}.txt', sep='\t', index=False, header=False)
+    pairwise_df.to_csv(f'sample_contrasts_{timestamp}.tsv', sep='\t', index=False, header=False)
