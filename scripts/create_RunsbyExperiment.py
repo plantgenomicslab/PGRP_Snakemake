@@ -15,7 +15,7 @@ def create_table(directory):
             sample = run
             # create a single row DataFrame and append it to the list
 #            df_list.append(pd.DataFrame({'Run': [run], 'Experiment': [experiment], 'Replicate': [replicate], 'Sample': [sample]}))
-            df_list.append(pd.DataFrame({'Run': [run], 'Experiment': [experiment], 'Replicate': [run], 'Sample': [experiment]}))
+            df_list.append(pd.DataFrame({'Run': [run], 'Treatment': [experiment], 'Replicate': [run], 'Sample': [experiment]}))
     df = pd.concat(df_list, ignore_index=True)  # concatenate all the DataFrames in the list
     return df
 
