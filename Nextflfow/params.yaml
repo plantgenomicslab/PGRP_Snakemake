@@ -1,0 +1,24 @@
+# params.yaml — dataset & behavior settings (no resources here)
+# Load with: -params-file params.yaml
+
+# Samples
+samples_file: RunsByExperiment.tsv
+source: local            # local | sra
+libraryType: PAIRED      # PAIRED | SINGLE
+PAIR_LIST: ['_1','_2']
+rawInputDir: /path/to/fastq
+sra_dir: sra
+
+# References
+genomeDir: /path/to/STAR_genomeDir
+ref: ['Genome','SA','SAindex']      # files expected under genomeDir
+GTFname: /path/to/genes.gtf
+RSEM_prepared_genome: /path/to/rsem/ref_prefix
+
+# Counting backends
+readCounting: ['RSEM','featureCounts','HTseq','TPMcalculator']
+
+# DEG options
+rep_relations: replication_relationship.txt
+sample_contrast: sample_contrasts.txt   # two-column TSV (Top	Bottom)
+runDEG: true
