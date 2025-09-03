@@ -181,6 +181,23 @@ sbatch --mem=4g \
        -e snakemake.err \
        --wrap="./run.sh"
 ```
+## error checking
+
+# Slurm accounting for both jobs
+`sacct -j 5396911,5396912 --format=JobID,State,ExitCode,Elapsed,NodeList,MaxRSS,MaxVMSize%20`
+
+# Full Slurm job records (helpful if they were OOM-killed or preempted)
+```
+scontrol show job -dd 5396911
+scontrol show job -dd 5396912
+```
+
+# Tool logs from your rules
+```
+tail -n +200 output/AgteqT02_rep2/AgteqT02_rep2/logs/AgteqT02_rep2_raw_fastqc.log
+tail -n +200 output/AgteqT12_rep1/AgteqT12_rep1/logs/AgteqT12_rep1_trim.log
+```
+
 
 ## Citations
 - Martin, M. (2011). Cutadapt removes adapter sequences from high-throughput sequencing reads. EMBnet.journal, 17(1), pp. 10-12. doi:https://doi.org/10.14806/ej.17.1.200
