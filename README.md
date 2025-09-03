@@ -197,7 +197,10 @@ scontrol show job -dd 5396912
 tail -n +200 output/AgteqT02_rep2/AgteqT02_rep2/logs/AgteqT02_rep2_raw_fastqc.log
 tail -n +200 output/AgteqT12_rep1/AgteqT12_rep1/logs/AgteqT12_rep1_trim.log
 ```
-
+## Nextflow
+```
+nextflow run main.nf -params-file params.yaml -c resources-slurm.config -resume -with-report report.html -with-trace trace.txt -with-timeline timeline.html -with-dag flowchart.png
+```
 
 ## Citations
 - Martin, M. (2011). Cutadapt removes adapter sequences from high-throughput sequencing reads. EMBnet.journal, 17(1), pp. 10-12. doi:https://doi.org/10.14806/ej.17.1.200
