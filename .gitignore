@@ -1,0 +1,12 @@
+# Generated BBDuk reference fastas (build via scripts/build_bbduk_refs.sh)
+data/bbduk_refs/*.fa
+data/bbduk_refs/*.fa.gz
+
+# Snakemake working dirs
+.snakemake/
+output/
+
+# Editor / OS
+*.swp
+*.swo
+.DS_Store
