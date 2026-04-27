@@ -10,7 +10,7 @@ libraryType: SINGLE                   # [PAIRED|SINGLE] RNAseq library type
 PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read files (libraryType=PAIRED)
 
 genomeDir: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref # Base genome folder
-GTF_name: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf # location of gtf file
+GTFname: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf # location of gtf file
 ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
