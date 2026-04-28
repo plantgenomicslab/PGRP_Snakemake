@@ -74,8 +74,8 @@ else
     || { echo "FAIL: bbduk_filter_PAIRED scheduled despite bbduk_enable=false"; exit 1; }
 fi
 
-# Always-required jobs
-for rule in align_PAIRED trim_PAIRED featureCounts; do
+# Always-required jobs (rule names match the post-Tier-2 unified layout)
+for rule in align trim_PAIRED featureCounts; do
   grep -q "^$rule" "$SANDBOX/dry_run.log" \
     || { echo "FAIL: $rule missing from dry-run output"; exit 1; }
 done

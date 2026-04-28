@@ -54,7 +54,7 @@ __default__:
   account: placeholder    # Provide your slurm account
   partition: placeholder  # Provide your slurm partition
   memory: 8g
-  name: {rule}.{wildcards}
+  name: "{rule}.{wildcards}"
   ncpus: 2
   nodes: 1
   time: 7-0:00:00
