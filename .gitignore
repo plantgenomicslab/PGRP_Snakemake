@@ -14,3 +14,5 @@ output/
 # Python bytecode
 __pycache__/
 *.pyc
+# BBDuk smoke-test scratch
+tests/_workdir/

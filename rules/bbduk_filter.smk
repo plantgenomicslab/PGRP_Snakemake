@@ -121,3 +121,9 @@ rule bbduk_filter_SINGLE:
             threads={threads} -Xmx{params.mem_g}g \
             {params.extra} 2> {log}
         """
+
+
+if LAYOUT == "PAIRED":
+    ruleorder: bbduk_filter_PAIRED > bbduk_filter_SINGLE
+elif LAYOUT == "SINGLE":
+    ruleorder: bbduk_filter_SINGLE > bbduk_filter_PAIRED
