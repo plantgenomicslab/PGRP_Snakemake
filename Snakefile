@@ -1,4 +1,6 @@
-import yaml, sys, os
+import os
+import sys
+
 import pandas as pd
 
 # Load run and sample information from the sraRunsByExperiment.tsv input file (user must provide)
@@ -7,13 +9,9 @@ SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].tolist()))
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
 
-# Load configs
+# Load configs (Snakemake's configfile: directive populates the `config` dict;
+# no need to re-load yaml manually).
 configfile: "config.yml"
-try:
-	with open('config.yml', "r") as config_file:
-		config_dict = yaml.safe_load(config_file)
-except yaml.YAMLError as e:
-	sys.exit(f"Could not load config file! Check config.yml ...See error below:\n\n{e}")
 
 SOURCE = config["source"]
 LAYOUT = config["libraryType"] #TODO enable mixed library types
@@ -48,20 +46,20 @@ def align_inputs(wc):
 	return _bbduk_inputs(wc) if BBDUK_ENABLE else _trim_inputs(wc)
 
 # Check for an indexed reference genome or prepared genome for RSEM
-if "RSEM" in config_dict["readCounting"]:
-	if not os.path.exists(f"{config_dict['RSEM_prepared_genome']}.seq"):
-		sys.exit(f"Cannot locate '{config_dict['RSEM_prepared_genome']}'.\nProvide a reference genome prepared with 'rsem-prepare-reference' to use RSEM.\nExiting...")
+if "RSEM" in config["readCounting"]:
+	if not os.path.exists(f"{config['RSEM_prepared_genome']}.seq"):
+		sys.exit(f"Cannot locate '{config['RSEM_prepared_genome']}'.\nProvide a reference genome prepared with 'rsem-prepare-reference' to use RSEM.\nExiting...")
 
-for ref in config_dict["ref"]:
-	if not os.path.exists(f"{config_dict['genomeDir']}/{ref}"):
+for ref in config["ref"]:
+	if not os.path.exists(f"{config['genomeDir']}/{ref}"):
 		sys.exit("The " + ref + " file is missing.\nHave you provided the correct paths to a reference genome indexed by STAR?\nExiting...")
 
 # Configure DEG calculation (user must provide)
 #TODO: write better method for identifying DEG contrasts output files. Maybe 'checkpoint'?
-contrasts = os.path.exists(config_dict["sample_contrast"])
-if config_dict["runDEG"]:
+contrasts = os.path.exists(config["sample_contrast"])
+if config["runDEG"]:
 	try:
-		CONTRASTS_FILE = pd.read_csv(config_dict["sample_contrast"], sep="\t", header=None)
+		CONTRASTS_FILE = pd.read_csv(config["sample_contrast"], sep="\t", header=None)
 		cTop = CONTRASTS_FILE.iloc[-1][0]
 		cBottom = CONTRASTS_FILE.iloc[-1][1]
 	except (FileNotFoundError, pd.errors.EmptyDataError):
@@ -85,7 +83,7 @@ os.makedirs("output/DEG/", exist_ok=True)
 
 counting_options  = ("RSEM","featureCounts","HTseq","TPMcalculator")
 for opt in counting_options:
-	if opt in config_dict["readCounting"]:
+	if opt in config["readCounting"]:
 		os.makedirs(f"output/counts/{opt}/", exist_ok=True)
 
 for rep in REPLICATE_LIST:
@@ -103,45 +101,45 @@ def allInput():
 	star = False
 	
 	# Count and DEG files
-	if "RSEM" in config_dict["readCounting"]:
+	if "RSEM" in config["readCounting"]:
 		inputs += ["output/counts/RSEM/RSEM_TPM.tsv.average.tsv",
 			   "output/counts/RSEM/RSEM_TPM.tsv"]
-		if config_dict["runDEG"]:
+		if config["runDEG"]:
 			inputs += ["output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
 				   "output/DEG/RSEM_expected_count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"]
-	if "featureCounts" in config_dict["readCounting"]:
+	if "featureCounts" in config["readCounting"]:
 		inputs += ["output/counts/featureCounts/featureCounts.cnt",
 			   "output/counts/featureCounts/featureCounts.tpm.tsv",
 			   "output/counts/featureCounts/featureCounts.fpkm.tsv",
 			   "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv",
 			   "output/counts/featureCounts/featureCount_clean.cnt"]
-		if config_dict["runDEG"]:
+		if config["runDEG"]:
 			inputs += ["output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset",
 				   "output/DEG/featureCount_clean.cnt." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results"]
-	if "HTseq" in config_dict["readCounting"]:
+	if "HTseq" in config["readCounting"]:
 		inputs += ["output/counts/htseq/htseq-count.tsv",
 			   "output/counts/htseq/htseq-count.tpm.tsv",
 			   "output/counts/htseq/htseq-count.fpkm.tsv",
 			   "output/counts/htseq/htseq-count.tpm.tsv.average.tsv"]
-		if config_dict["runDEG"]:
+		if config["runDEG"]:
 			inputs += ["output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results",
 				   "output/DEG/htseq-count.tsv." + cTop  + "_vs_" + cBottom  + ".DESeq2.DE_results.P0.01_C1.DE.subset"]
-	if "TPMcalculator" in config_dict["readCounting"]:
+	if "TPMcalculator" in config["readCounting"]:
 		inputs += ["output/counts/tpmcalculator/tpmcalculator-merged.tsv",
 			   "output/counts/tpmcalculator/tpmcalculator-merged.tsv.average.tsv"]
 		
 	# Per-replicate data and processing files
 	for replicate in REPLICATE_LIST:	
-		if "TPMcalculator" in config_dict["readCounting"]:
+		if "TPMcalculator" in config["readCounting"]:
 			inputs.append("output/counts/tpmcalculator/" + replicate + "_genes.out")
 			star = True
 
-		if "RSEM" in config_dict["readCounting"]:
+		if "RSEM" in config["readCounting"]:
 			inputs.append("output/counts/RSEM/" + replicate + ".genes.results")
 			inputs.append("output/" + replicate + "/bam/" + replicate + ".RSEM.bam")
 			rsem = True
 		
-		if ("featureCounts" in config_dict["readCounting"]) | ("HTseq" in config_dict["readCounting"]) | ("TPMcalculator" in config_dict["readCounting"]):
+		if ("featureCounts" in config["readCounting"]) | ("HTseq" in config["readCounting"]) | ("TPMcalculator" in config["readCounting"]):
 				inputs.append("output/" + replicate + "/bam/" + replicate + ".STAR.bam")
 				star = True
 
@@ -484,7 +482,7 @@ rule TPMCalculator:
 			   -k gene_id \
 			   -t transcript_id \
 			   -o 0 \
-			   -g " + config_dict["GTFname"] + " -b {input}")
+			   -g " + config["GTFname"] + " -b {input}")
 		# Move output files to proper location
 		shell("mv {wildcards.replicate}_genes.* output/counts/tpmcalculator/")
 
@@ -512,7 +510,7 @@ rule featureCounts:
 				-Q 1 \
 				-p -M \
 				-g gene_id \
-				-a " + config_dict["GTFname"] + " {input} \
+				-a " + config["GTFname"] + " {input} \
 			2> {log}")
 		# Remove the featureCounts header line from output file and re-format the output names
 		shell("cat {output.raw} |  egrep -v '#' | \
@@ -536,7 +534,7 @@ rule HTseq:
 				 --idattr gene_id \
 				 --nprocesses {threads} \
 				 --counts_output {output} \
-				 {input} " + config_dict["GTFname"] + "  \
+				 {input} " + config["GTFname"] + "  \
 				 &> {log}")
 		# Add headers to label HTseq tsv output fields
 		shell("sed -i '1 i\gene\\t" + "\\t".join(input) + "' {output} &&\
@@ -583,11 +581,11 @@ rule DEG_featureCounts:
 	log: "output/DEG/DEG_featureCounts.log"
 	threads: config["threads"]["DEG_featureCounts"]
 	params:
-		replication = os.path.join(os.getcwd(), config_dict["rep_relations"]),
+		replication = os.path.join(os.getcwd(), config["rep_relations"]),
 		matrix =  os.path.join(os.getcwd(), "output/counts/featureCounts/featureCount_clean.cnt")
 	run:
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config_dict["rep_relations"] + " --contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("run_DE_analysis.pl --matrix {input.featureCounts} --method DESeq2 --samples_file " + config["rep_relations"] + " --contrasts " + config["sample_contrast"] + " --output output/DEG")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 		shell("cd output/counts/featureCounts && PtR --matrix featureCount_clean.cnt --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
@@ -603,12 +601,12 @@ rule DEG_HTseq:
 	message: "-------Calculating DEGs {output}---------"
 	log: "output/DEG/DEG_HTseq.log"
 	params:
-		 replication = os.path.join(os.getcwd(), config_dict["rep_relations"]),
+		 replication = os.path.join(os.getcwd(), config["rep_relations"]),
 		 matrix =  os.path.join(os.getcwd(), "output/counts/htseq/htseq-count.tsv")
 	threads: config["threads"]["DEG_HTseq"]
 	run:
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config_dict["rep_relations"] + "--contrasts " + config_dict["sample_contrast"] + " --output output/DEG")
+		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config["rep_relations"] + "--contrasts " + config["sample_contrast"] + " --output output/DEG")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 		shell("cd output/counts/htseq && PtR --matrix htseq-count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")
@@ -626,9 +624,9 @@ rule DEG_RSEM:
 	log: "output/DEG/DEG_RSEM.log"
 	threads: config["threads"]["DEG_RSEM"]
 	params:
-		rep_relations = os.path.join(os.getcwd(), config_dict["rep_relations"]),
+		rep_relations = os.path.join(os.getcwd(), config["rep_relations"]),
 		matrix =  os.path.join(os.getcwd(), "output/counts/RSEM/RSEM_expected_count.tsv"),
-		sample_contrast = os.path.join(os.getcwd(),config_dict["sample_contrast"])
+		sample_contrast = os.path.join(os.getcwd(),config["sample_contrast"])
 	run:
 		# Merge RESM output files into matrix
 		shell("python ./scripts/makeRSEMMatrix.py RunsByExperiment.tsv output/counts/RSEM expected_count")
