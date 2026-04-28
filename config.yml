@@ -173,4 +173,5 @@ bbduk_k: 31                                          # k-mer size (BBDuk default
 bbduk_mcf: 0.5                                       # min cover fraction (BBDuk default)
 bbduk_threads: 16
 bbduk_mem_gb: 32
-bbduk_extra_args: ""                                 # e.g., "rcomp=t hdist=1" for fuzzy matching
+bbduk_extra_args: ""                                 # e.g., "rcomp=t hdist=1" for fuzzy matching.
+                                                     # WARNING: passed unquoted to bbduk.sh — only set from trusted config.

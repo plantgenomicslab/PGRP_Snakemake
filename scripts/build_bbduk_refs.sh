@@ -22,25 +22,52 @@ if ! command -v efetch >/dev/null 2>&1; then
   exit 1
 fi
 
-fetch_set() {
-  # $1 = column index (3 = cp_acc, 4 = mt_acc), $2 = output basename (without .gz)
-  local col="$1" out="$2"
-  : > "${out}.tmp"
-  awk -F'\t' -v c="$col" 'NR>1 && $c != "" {print $c}' "$LIST" | while read -r acc; do
-    echo "  fetch $acc -> $out"
-    # 1-second courtesy spacing for NCBI Entrez (24 sequential calls in this script)
-    efetch -db nucleotide -id "$acc" -format fasta >> "${out}.tmp"
-    sleep 1
+retry() {
+  # retry CMD ARGS...  — up to 3 attempts, exponential backoff 5/10/15s
+  local n=0 max=3 delay=5
+  until "$@"; do
+    n=$((n + 1))
+    if [ "$n" -ge "$max" ]; then
+      echo "ERROR: command failed after $max attempts: $*" >&2
+      return 1
+    fi
+    echo "  retry $n/$max in $((delay * n))s: $*" >&2
+    sleep $((delay * n))
   done
-  mv "${out}.tmp" "$out"
-  gzip -f "$out"
-  echo "${out}.gz built: $(zcat "${out}.gz" | grep -c '^>') sequences"
 }
 
-fetch_set 3 cp_12sp.fa
-fetch_set 4 mt_12sp.fa
+fetch_cp_set() {
+  # NCBI recommends epost | efetch batching for >3 IDs.
+  awk -F'\t' 'NR>1 && $3 != "" {print $3}' "$LIST" \
+    | epost -db nucleotide \
+    | efetch -format fasta > cp_12sp.fa.tmp
+}
 
-curl -fsSL https://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec > univec.fa
+fetch_mt_set() {
+  awk -F'\t' 'NR>1 && $4 != "" {print $4}' "$LIST" \
+    | epost -db nucleotide \
+    | efetch -format fasta > mt_12sp.fa.tmp
+}
+
+fetch_univec() {
+  curl -fsSL https://ftp.ncbi.nlm.nih.gov/pub/UniVec/UniVec > univec.fa.tmp
+}
+
+echo "Fetching chloroplast set (cp_12sp.fa) via epost | efetch..."
+retry fetch_cp_set
+mv cp_12sp.fa.tmp cp_12sp.fa
+gzip -f cp_12sp.fa
+echo "cp_12sp.fa.gz built: $(zcat cp_12sp.fa.gz | grep -c '^>') sequences"
+
+echo "Fetching mitochondrion set (mt_12sp.fa) via epost | efetch..."
+retry fetch_mt_set
+mv mt_12sp.fa.tmp mt_12sp.fa
+gzip -f mt_12sp.fa
+echo "mt_12sp.fa.gz built: $(zcat mt_12sp.fa.gz | grep -c '^>') sequences"
+
+echo "Fetching UniVec..."
+retry fetch_univec
+mv univec.fa.tmp univec.fa
 gzip -f univec.fa
 echo "univec.fa.gz built: $(zcat univec.fa.gz | grep -c '^>') sequences"
 
