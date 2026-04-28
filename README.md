@@ -183,6 +183,10 @@ bash scripts/build_bbduk_refs.sh
 #    bbduk_enable: true
 ```
 
+### Driver-side environment
+
+`rules/bbduk_filter.smk` resolves `ribokmers.fa.gz` by inspecting the BBTools install relative to `$(which bbduk.sh)`. This resolution runs in the Snakemake **driver process**, not on the SLURM workers, so the `pgrp-bbduk` conda env (or at least `bbduk.sh` on PATH) must be active wherever you launch `snakemake`. If you can't activate the env on the driver — common when the driver lives on a login node with no `bbmap` install — set `bbduk_ribokmers` in `config.yml` to an absolute path to `ribokmers.fa.gz` to skip auto-resolution.
+
 ### Output
 
 For each sample the rule writes:
@@ -197,6 +201,8 @@ Aggregate per-sample stats into one tidy TSV after a run:
 ```bash
 python scripts/aggregate_bbduk_stats.py output bbduk_summary.tsv
 ```
+
+> Note: for paired-end libraries the `total_reads` / `contam_reads` / `clean_reads` columns count individual reads (R1 + R2), not read pairs — that is the convention BBDuk's own `stats.txt` `#Total` line uses.
 
 ### Disabling
 

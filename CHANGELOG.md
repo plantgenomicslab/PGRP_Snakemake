@@ -14,7 +14,7 @@
 ### Changed
 
 - `Snakefile` `align_PAIRED`, `align_SINGLE`, `alignRSEM_PAIRED`, `alignRSEM_SINGLE` now consume BBDuk clean output when `bbduk_enable: true` (backward-compatible: `false` keeps the original DAG and inputs unchanged).
-- `align_SINGLE` and `alignRSEM_SINGLE` shell commands switched from positional `{input}` to named `{input.fwd_fastq}` (now that input arrives via `unpack(...)`).
+- **(potentially breaking for downstream forks)** `align_SINGLE` and `alignRSEM_SINGLE` shell commands switched from positional `{input}` to named `{input.fwd_fastq}` (now that input arrives via `unpack(...)`). Forks that override these rules with custom `shell:` blocks referencing `{input}` will need to update.
 
 ### Fixed
 
