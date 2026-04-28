@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit-tests:
+    name: Python unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Run aggregate_bbduk_stats unit tests
+        run: python3 tests/test_aggregate_stats.py -v
+
+  bash-syntax:
+    name: Bash syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n on every shell script
+        run: |
+          shopt -s nullglob
+          fail=0
+          for f in scripts/*.sh tests/*.sh run.sh; do
+            if bash -n "$f"; then
+              echo "OK: $f"
+            else
+              echo "FAIL: $f" >&2
+              fail=1
+            fi
+          done
+          exit $fail
+
+  yaml-parse:
+    name: YAML config parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install pyyaml
+      - name: Parse all committed YAML configs
+        run: |
+          for f in config.yml examples/example_config.yml envs/bbduk.yaml; do
+            python3 -c "import yaml; yaml.safe_load(open('$f')); print('OK:', '$f')"
+          done
+
+  snakemake-dry-run:
+    name: Snakemake dry-run (bbduk_enable=${{ matrix.bbduk_enable }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bbduk_enable: ["false", "true"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install snakemake + minimum deps
+        run: pip install "snakemake==7.32.4" pyyaml pandas
+      - name: Sandboxed dry-run
+        run: bash tests/ci_dry_run.sh ${{ matrix.bbduk_enable }}
