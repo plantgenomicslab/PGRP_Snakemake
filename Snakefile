@@ -184,6 +184,16 @@ elif LAYOUT == "SINGLE":
 
 localrules: all, importRaw_PAIRED, importRaw_SINGLE
 
+
+def flagstat_check(output, log):
+	"""Run `samtools flagstat` against a BAM and abort the rule on failure."""
+	shell(
+		"echo '--------Checking " + str(output) + "----------' && "
+		"samtools flagstat " + str(output) + " "
+		"|| { echo 'samtools flagstat found errors in " + str(output) + ". "
+		"Check log here: " + str(log) + ". Exiting......' >&2 ; exit 1; }"
+	)
+
 rule all:
 	input:
 		allInput()
@@ -326,9 +336,7 @@ rule align:
 				--readFilesCommand gunzip -c --readFilesIn {input} \
 				--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
 				2> {log}")
-		shell("echo '--------Checking {output}----------'")
-		shell("set +e")
-		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
+		flagstat_check(output, log)
 
 rule alignRSEM:
 	input:
@@ -371,9 +379,7 @@ rule mergeRSEM:
 			shell("ln -s --relative {input} {output}")
 			print("1 run per sample...skipping BAM merge")
 		# Perform check on output bam file to ensure it is not corrupted
-		shell("echo '--------Checking {output}----------'")
-		shell("set +e")
-		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
+		flagstat_check(output, log)
 
 #TODO: Need to merge bam files from each run to calculate replicate-level expression
 rule calculateRSEMExpression:
@@ -409,9 +415,7 @@ rule mergeSTAR:
 			shell("ln -s {input} {output}")
 			print("1 run per sample...skipping BAM merge")
 		# Perform check on output bam file to ensure it is not corrupted
-		shell("echo '--------Checking {output}----------'")
-		shell("set +e")
-		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
+		flagstat_check(output, log)
 
 rule TPMCalculator:
 	input: "output/{replicate}/bam/{replicate}.STAR.bam"
