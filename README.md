@@ -154,6 +154,63 @@ ZT8	ZT8_rep2
 ZT8	ZT8_rep3
 ```
 
+## Optional: BBDuk pre-alignment contaminant filter
+
+`PGRP_Snakemake` ships with an optional pre-alignment filter (BBDuk single-pass at `k=31`) that removes rRNA, chloroplast, mitochondrion, and vector reads before STAR alignment. On plant total-RNA libraries this typically lifts STAR's uniquely-mapped rate by 5–30 percentage points; the gain is smaller for polyA-selected libraries. The filter is **off by default** (`bbduk_enable: false` in `config.yml`); enable it once references are built.
+
+### Reference set
+
+Four references are concatenated for a single BBDuk pass:
+
+- **rRNA k-mers** — BBTools-bundled `ribokmers.fa.gz` (broad-phylogeny rRNA)
+- **Chloroplast (12 species)** — `data/bbduk_refs/cp_12sp.fa.gz`
+- **Mitochondrion (12 species)** — `data/bbduk_refs/mt_12sp.fa.gz`
+- **Vector** — NCBI UniVec → `data/bbduk_refs/univec.fa.gz`
+
+The 12 species span all major land-plant clades (algae → bryophyte → lycophyte → gymnosperm → seven angiosperm clades). The canonical accession list lives at `data/bbduk_refs/SPECIES_LIST.tsv`; edit that file and re-run the build script to add or swap species.
+
+### Setup
+
+```bash
+# 1. Install env once
+conda env create -f envs/bbduk.yaml
+conda activate pgrp-bbduk
+
+# 2. Build references once (~5 min, fetches 24 GenBank records via efetch + UniVec via curl)
+bash scripts/build_bbduk_refs.sh
+
+# 3. Enable in config.yml
+#    bbduk_enable: true
+```
+
+### Output
+
+For each sample the rule writes:
+
+- `output/{replicate}/{sample}/bbduk/{sample}{_1,_2}_clean.fq.gz` — fed to STAR
+- `output/{replicate}/{sample}/bbduk/{sample}{_1,_2}_contam.fq.gz` — archived contaminant reads
+- `output/{replicate}/{sample}/bbduk/{sample}_stats.txt` and `{sample}_refstats.txt` — per-sample contamination breakdown
+- `output/{replicate}/{sample}/logs/{sample}_bbduk.log` — BBDuk stderr
+
+Aggregate per-sample stats into one tidy TSV after a run:
+
+```bash
+python scripts/aggregate_bbduk_stats.py output bbduk_summary.tsv
+```
+
+### Disabling
+
+Set `bbduk_enable: false` in `config.yml` (the default) to bypass the filter; the DAG falls back to `trim_*` → `align_*` directly with no other changes required.
+
+### Smoke test
+
+```bash
+export SMOKE_R1=/path/to/R1.fq.gz SMOKE_R2=/path/to/R2.fq.gz
+bash tests/test_bbduk_filter.sh
+```
+
+Expected: `PASS` plus a refstats table with non-zero rRNA / cp / mt / univec read counts.
+
 ## Running the pipeline 
 
 ### Running without scheduler

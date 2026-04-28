@@ -10,7 +10,7 @@ libraryType: SINGLE                   # [PAIRED|SINGLE] RNAseq library type
 PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read files (libraryType=PAIRED)
 
 genomeDir: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref # Base genome folder
-GTF_name: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf # location of gtf file
+GTFname: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf # location of gtf file
 ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
@@ -153,3 +153,24 @@ summarize:
 summarizeRSEM:
   ncpus: 2
   memory: 8g
+bbduk_filter_PAIRED:
+  ncpus: 16
+  memory: 32g
+bbduk_filter_SINGLE:
+  ncpus: 16
+  memory: 32g
+
+#############################################################################################
+# BBDuk pre-alignment contaminant filter (rRNA + cp + mt + UniVec)
+# Optional. Build references once via:  bash scripts/build_bbduk_refs.sh
+# ribokmers.fa.gz auto-located in the BBTools install (bbmap conda pkg).
+#############################################################################################
+bbduk_enable: false                                  # opt-in; set true to insert BBDuk between trim_* and align_*
+bbduk_bin: bbduk.sh                                  # assume bbmap conda env on PATH; absolute path also accepted
+bbduk_refs_dir: data/bbduk_refs                      # contains cp_12sp.fa.gz, mt_12sp.fa.gz, univec.fa.gz
+bbduk_ribokmers: auto                                # 'auto' resolves via $(dirname $(which bbduk.sh))/.. ; or set absolute path
+bbduk_k: 31                                          # k-mer size (BBDuk default for genome contamination)
+bbduk_mcf: 0.5                                       # min cover fraction (BBDuk default)
+bbduk_threads: 16
+bbduk_mem_gb: 32
+bbduk_extra_args: ""                                 # e.g., "rcomp=t hdist=1" for fuzzy matching

@@ -22,6 +22,31 @@ if LAYOUT == "PAIRED":
 else:
 	PAIR_LIST = ["_1", "_2"]
 
+# BBDuk pre-alignment contaminant filter (optional). Enabled when config["bbduk_enable"] = true.
+# References must be built once via:  bash scripts/build_bbduk_refs.sh
+BBDUK_ENABLE = config.get("bbduk_enable", False)
+if BBDUK_ENABLE:
+	include: "rules/bbduk_filter.smk"
+
+def _trim_inputs(wc):
+	if LAYOUT == "PAIRED":
+		return {
+			"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/trim/{wc.sample}{PAIR_LIST[0]}_trimmed.fq.gz",
+			"rev_fastq": f"output/{wc.replicate}/{wc.sample}/trim/{wc.sample}{PAIR_LIST[1]}_trimmed.fq.gz",
+		}
+	return {"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/trim/{wc.sample}_trimmed.fq.gz"}
+
+def _bbduk_inputs(wc):
+	if LAYOUT == "PAIRED":
+		return {
+			"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/bbduk/{wc.sample}{PAIR_LIST[0]}_clean.fq.gz",
+			"rev_fastq": f"output/{wc.replicate}/{wc.sample}/bbduk/{wc.sample}{PAIR_LIST[1]}_clean.fq.gz",
+		}
+	return {"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/bbduk/{wc.sample}_clean.fq.gz"}
+
+def align_inputs(wc):
+	return _bbduk_inputs(wc) if BBDUK_ENABLE else _trim_inputs(wc)
+
 # Check for an indexed reference genome or prepared genome for RSEM
 if "RSEM" in config_dict["readCounting"]:
 	if not os.path.exists(f"{config_dict['RSEM_prepared_genome']}.seq"):
@@ -294,8 +319,7 @@ rule trim_SINGLE:
 
 rule align_PAIRED:
 	input:
-		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + "_trimmed.fq.gz",
-		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + "_trimmed.fq.gz"
+		unpack(align_inputs)
 	output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
 	message: "-----Aligning {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_align.log"
@@ -316,7 +340,8 @@ rule align_PAIRED:
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule align_SINGLE:
-	input: "output/{replicate}/{sample}/trim/{sample}_trimmed.fq.gz"
+	input:
+		unpack(align_inputs)
 	output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
 	message: "-----Aligning {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_align.log"
@@ -328,7 +353,7 @@ rule align_SINGLE:
 				--quantMode TranscriptomeSAM GeneCounts \
 				--outBAMsortingBinsN 200 \
 				--genomeDir " + config["genomeDir"]  + " \
-				--readFilesCommand gunzip -c --readFilesIn {input} \
+				--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} \
 				--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
 				2> {log}")
 		# Perform check on output bam file to ensure it is not corrupted
@@ -337,7 +362,8 @@ rule align_SINGLE:
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
 rule alignRSEM_SINGLE:
-	input: "output/{replicate}/{sample}/trim/{sample}_trimmed.fq.gz"
+	input:
+		unpack(align_inputs)
 	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
 	message: "-----Aligning for RSEM: {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
@@ -349,7 +375,7 @@ rule alignRSEM_SINGLE:
 			--limitBAMsortRAM 20000000000 \
 			--outBAMsortingBinsN 200 \
 			--genomeDir " + config["genomeDir"]  + " \
-			--readFilesCommand gunzip -c --readFilesIn {input} \
+			--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} \
 			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
 			--quantTranscriptomeBan IndelSoftclipSingleend  \
 			--alignEndsType EndToEnd  \
@@ -357,8 +383,7 @@ rule alignRSEM_SINGLE:
 
 rule alignRSEM_PAIRED:
 	input:
-		fwd_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[0] + "_trimmed.fq.gz",
-		rev_fastq = "output/{replicate}/{sample}/trim/{sample}" + PAIR_LIST[1] + "_trimmed.fq.gz"
+		unpack(align_inputs)
 	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
 	message: "-----Aligning for RSEM: {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"

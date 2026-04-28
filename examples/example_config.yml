@@ -10,7 +10,7 @@ libraryType: PAIRED                   # [PAIRED|SINGLE] RNAseq library type
 PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read files (libraryType=PAIRED)
 
 genomeDir: placeholder                # (path) Reference genome directory
-GTF_name: placeholder                 # (path) Path to GTF file for STAR alignment
+GTFname: placeholder                  # (path) Path to GTF file for STAR alignment
 ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)

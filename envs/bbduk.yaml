@@ -1,0 +1,9 @@
+name: pgrp-bbduk
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - bbmap=39.06          # provides bbduk.sh + ribokmers.fa.gz
+  - entrez-direct=22.4   # for scripts/build_bbduk_refs.sh
+  - python=3.10
+  - pandas               # for scripts/aggregate_bbduk_stats.py
