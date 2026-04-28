@@ -164,9 +164,6 @@ def allInput():
 	return(inputs)
 
 if LAYOUT == "PAIRED":
-	ruleorder: align_PAIRED > align_SINGLE
-	ruleorder: alignRSEM_PAIRED > alignRSEM_SINGLE
-	ruleorder: calculateRSEMExpression_PAIRED > calculateRSEMExpression_SINGLE
 	ruleorder: trim_PAIRED > trim_SINGLE
 	ruleorder: convertSRAtoFastq_PAIRED > convertSRAtoFastq_SINGLE
 	ruleorder: importRaw_PAIRED > importRaw_SINGLE
@@ -176,9 +173,6 @@ if LAYOUT == "PAIRED":
 	else:
 		ruleorder: convertSRAtoFastq_PAIRED > importRaw_PAIRED
 elif LAYOUT == "SINGLE":
-	ruleorder: align_SINGLE > align_PAIRED
-	ruleorder: alignRSEM_SINGLE > alignRSEM_PAIRED
-	ruleorder: calculateRSEMExpression_SINGLE > calculateRSEMExpression_PAIRED
 	ruleorder: trim_SINGLE > trim_PAIRED
 	ruleorder: convertSRAtoFastq_SINGLE > convertSRAtoFastq_PAIRED
 	ruleorder: importRaw_SINGLE > importRaw_PAIRED
@@ -315,85 +309,41 @@ rule trim_SINGLE:
 		# Run quality control on trimmed reads
 		shell("fastqc --threads {threads} {output} --outdir output/{wildcards.replicate}/{wildcards.sample}/trim 2> {log}")
 
-rule align_PAIRED:
+rule align:
 	input:
 		unpack(align_inputs)
-	output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
+	output: "output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
 	message: "-----Aligning {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_align.log"
 	threads: config["threads"]["align"]
 	run:
-		# Calculate run-level alignments to reference
+		# {input} expands to either fwd_fastq or fwd_fastq+rev_fastq depending on LAYOUT (see align_inputs).
 		shell("STAR --runMode alignReads --runThreadN {threads} \
 				--outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
 				--quantMode TranscriptomeSAM GeneCounts \
 				--outBAMsortingBinsN 200 \
 				--genomeDir " + config["genomeDir"]  + " \
-				--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
+				--readFilesCommand gunzip -c --readFilesIn {input} \
 				--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
 				2> {log}")
-		# Perform check on output bam file to ensure it is not corrupted
 		shell("echo '--------Checking {output}----------'")
 		shell("set +e")
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
-rule align_SINGLE:
+rule alignRSEM:
 	input:
 		unpack(align_inputs)
-	output:"output/{replicate}/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam"
-	message: "-----Aligning {wildcards.sample}-----"
-	log: "output/{replicate}/{sample}/logs/{sample}_align.log"
-	threads: config["threads"]["align"]
-	run:
-		# Calculate run-level alignments to reference
-		shell("STAR --runMode alignReads --runThreadN {threads} \
-				--outFilterMultimapNmax 100 --alignIntronMin 25 --alignIntronMax 50000 \
-				--quantMode TranscriptomeSAM GeneCounts \
-				--outBAMsortingBinsN 200 \
-				--genomeDir " + config["genomeDir"]  + " \
-				--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} \
-				--outSAMtype BAM SortedByCoordinate --outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.bam  \
-				2> {log}")
-		# Perform check on output bam file to ensure it is not corrupted
-		shell("echo '--------Checking {output}----------'")
-		shell("set +e")
-		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
-
-rule alignRSEM_SINGLE:
-	input:
-		unpack(align_inputs)
-	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
+	output: "output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
 	message: "-----Aligning for RSEM: {wildcards.sample}-----"
 	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
 	threads: config["threads"]["align"]
 	run:
-		# Calculate run-level alignments to reference
 		shell("STAR --runMode alignReads --runThreadN {threads} \
 			--outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
 			--limitBAMsortRAM 20000000000 \
 			--outBAMsortingBinsN 200 \
 			--genomeDir " + config["genomeDir"]  + " \
-			--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} \
-			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
-			--quantTranscriptomeBan IndelSoftclipSingleend  \
-			--alignEndsType EndToEnd  \
-			--outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.xs.bam")
-
-rule alignRSEM_PAIRED:
-	input:
-		unpack(align_inputs)
-	output:"output/{replicate}/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam"
-	message: "-----Aligning for RSEM: {wildcards.sample}-----"
-	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
-	threads: config["threads"]["align"]
-	run:
-		# Calculate run-level alignments to reference
-		shell("STAR --runMode alignReads --runThreadN {threads} \
-			--outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
-			--limitBAMsortRAM 20000000000 \
-			--outBAMsortingBinsN 200 \
-			--genomeDir " + config["genomeDir"]  + " \
-			--readFilesCommand gunzip -c --readFilesIn {input.fwd_fastq} {input.rev_fastq} \
+			--readFilesCommand gunzip -c --readFilesIn {input} \
 			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
 			--quantTranscriptomeBan IndelSoftclipSingleend  \
 			--alignEndsType EndToEnd  \
@@ -425,24 +375,17 @@ rule mergeRSEM:
 		shell("set +e")
 		shell("if ! samtools flagstat {output}; then echo 'samtools flagstat found errors in {output}. Check log here: {log}. Exiting......' && exit 1; fi")
 
-rule calculateRSEMExpression_PAIRED:
-	input: "output/{replicate}/bam/{replicate}.RSEM.bam"
-	output: "output/counts/RSEM/{replicate}.genes.results"
-	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
-	threads: config["threads"]["calculateRSEMExpression"]
-	run:
-		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
-			--paired-end {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
-
 #TODO: Need to merge bam files from each run to calculate replicate-level expression
-rule calculateRSEMExpression_SINGLE:
+rule calculateRSEMExpression:
 	input: "output/{replicate}/bam/{replicate}.RSEM.bam"
 	output: "output/counts/RSEM/{replicate}.genes.results"
-	message:"-----  Calculating RSEM expression: {wildcards.replicate}------"
+	message: "-----  Calculating RSEM expression: {wildcards.replicate}------"
 	threads: config["threads"]["calculateRSEMExpression"]
+	params:
+		paired = "--paired-end" if LAYOUT == "PAIRED" else "",
 	run:
 		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
-			 {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
+			{params.paired} {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
 
 def mergeInputSTAR(wildcards):
 	inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
