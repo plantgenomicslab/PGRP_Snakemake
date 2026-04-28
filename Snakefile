@@ -645,26 +645,26 @@ rule summarizeTPMCalc:
 		shell("./scripts/summarizeNormalizedCounts.py Gene_Id {input.tpmcalc}")
 
 rule summarizeHTseq:
-        input:
-                HTseq_TPM = "output/counts/htseq/htseq-count.tpm.tsv",
-                HTseq_FPKM = "output/counts/htseq/htseq-count.fpkm.tsv"
-        output: "output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
-        message: "--------------Summarizing HTseq--------------"
-        run:
-                # Compute summary statistics (average/standard deviation) from HTseq FPKM/TPM values
-                shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_TPM}")
-                shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_FPKM}")
+	input:
+		HTseq_TPM = "output/counts/htseq/htseq-count.tpm.tsv",
+		HTseq_FPKM = "output/counts/htseq/htseq-count.fpkm.tsv"
+	output: "output/counts/htseq/htseq-count.tpm.tsv.average.tsv"
+	message: "--------------Summarizing HTseq--------------"
+	run:
+		# Compute summary statistics (average/standard deviation) from HTseq FPKM/TPM values
+		shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_TPM}")
+		shell("./scripts/summarizeNormalizedCounts.py gene {input.HTseq_FPKM}")
 
 rule summarizeFeatureCounts:
-        input:
-                featureCounts_TPM = "output/counts/featureCounts/featureCounts.tpm.tsv",
-                featureCounts_FPKM = "output/counts/featureCounts/featureCounts.fpkm.tsv"
-        output: "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv"
-        message: "--------------Summarizing featureCounts--------------"
-        run:
-                # Compute summary statistics (average/standard deviation) from featureCounts FPKM/TPM values
-                shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
-                shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")
+	input:
+		featureCounts_TPM = "output/counts/featureCounts/featureCounts.tpm.tsv",
+		featureCounts_FPKM = "output/counts/featureCounts/featureCounts.fpkm.tsv"
+	output: "output/counts/featureCounts/featureCounts.tpm.tsv.average.tsv"
+	message: "--------------Summarizing featureCounts--------------"
+	run:
+		# Compute summary statistics (average/standard deviation) from featureCounts FPKM/TPM values
+		shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_TPM}")
+		shell("./scripts/summarizeNormalizedCounts.py Geneid {input.featureCounts_FPKM}")
 
 rule summarizeRSEM:
 	input: input_DEG_RSEM
