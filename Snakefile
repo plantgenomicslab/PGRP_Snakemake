@@ -22,30 +22,9 @@ if LAYOUT == "PAIRED":
 else:
 	PAIR_LIST = ["_1", "_2"]
 
-# BBDuk pre-alignment contaminant filter (optional). Enabled when config["bbduk_enable"] = true.
-# References must be built once via:  bash scripts/build_bbduk_refs.sh
-BBDUK_ENABLE = config.get("bbduk_enable", False)
-if BBDUK_ENABLE:
-	include: "rules/bbduk_filter.smk"
-
-def _trim_inputs(wc):
-	if LAYOUT == "PAIRED":
-		return {
-			"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/trim/{wc.sample}{PAIR_LIST[0]}_trimmed.fq.gz",
-			"rev_fastq": f"output/{wc.replicate}/{wc.sample}/trim/{wc.sample}{PAIR_LIST[1]}_trimmed.fq.gz",
-		}
-	return {"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/trim/{wc.sample}_trimmed.fq.gz"}
-
-def _bbduk_inputs(wc):
-	if LAYOUT == "PAIRED":
-		return {
-			"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/bbduk/{wc.sample}{PAIR_LIST[0]}_clean.fq.gz",
-			"rev_fastq": f"output/{wc.replicate}/{wc.sample}/bbduk/{wc.sample}{PAIR_LIST[1]}_clean.fq.gz",
-		}
-	return {"fwd_fastq": f"output/{wc.replicate}/{wc.sample}/bbduk/{wc.sample}_clean.fq.gz"}
-
-def align_inputs(wc):
-	return _bbduk_inputs(wc) if BBDUK_ENABLE else _trim_inputs(wc)
+# Align input routing (trim vs bbduk) lives in its own module.
+# Also conditionally pulls in rules/bbduk_filter.smk when bbduk_enable is true.
+include: "rules/align_inputs.smk"
 
 # Check for an indexed reference genome or prepared genome for RSEM
 if "RSEM" in config_dict["readCounting"]:
