@@ -64,6 +64,7 @@ jobs:
         with:
           python-version: "3.10"
       - name: Install snakemake + minimum deps
-        run: pip install "snakemake==7.32.4" pyyaml pandas
+        # pulp>=2.8 renamed list_solvers→listSolvers; snakemake 7.32.4 still calls the old name.
+        run: pip install "snakemake==7.32.4" "pulp<2.8" pyyaml pandas
       - name: Sandboxed dry-run
         run: bash tests/ci_dry_run.sh ${{ matrix.bbduk_enable }}
