@@ -44,16 +44,32 @@ git clone git@github.com:plantgenomicslab/PGRP_Snakemake.git
 
 ### Setting up a Conda environment 
 
-We recommend setting up a conda environment for PGRP_Snakemake to easily install the above dependencies. The latest version of Miniconda can be installed [here](https://docs.conda.io/en/latest/miniconda.html#latest-miniconda-installer-links). Use the commands below to set up the PGRP_Snakemake environment.
+We recommend [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) for fast, single-binary environment management. If you don't have it, conda (or mamba) works as a drop-in replacement — just substitute the binary name in the commands below.
+
+#### Quick install (micromamba)
 
 ```bash
-conda create -n PGRP_Snakemake -c bioconda -c conda-forge python=3.7 mamba
-
-conda activate PGRP_Snakemake
-
-mamba install -c bioconda -c conda-forge -c anaconda tabulate=0.8.10 trim-galore=0.6.7 sra-tools=2.11.0 STAR htseq=1.99.2 subread=2.0.1 multiqc=1.11 snakemake=7.24.0 parallel-fastq-dump=0.6.7 bioconductor-tximport samtools=1.14 r-ggplot2 trinity=2.13.2 hisat2 bioconductor-qvalue sambamba graphviz gffread tpmcalculator lxml rsem fastp=0.23.2
-
+# Linux/macOS one-liner; installs to ~/.local/bin/micromamba
+"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
 ```
+
+If `micromamba` is unavailable on your system, replace `micromamba` with `conda` (or `mamba`) in every command in this README — flags and arguments are compatible.
+
+#### Set up the environment
+
+```bash
+# Create env + install all dependencies in one shot
+micromamba create -n PGRP_Snakemake -c bioconda -c conda-forge -c anaconda \
+  python=3.7 \
+  tabulate=0.8.10 trim-galore=0.6.7 sra-tools=2.11.0 STAR htseq=1.99.2 \
+  subread=2.0.1 multiqc=1.11 snakemake=7.24.0 parallel-fastq-dump=0.6.7 \
+  bioconductor-tximport samtools=1.14 r-ggplot2 trinity=2.13.2 hisat2 \
+  bioconductor-qvalue sambamba graphviz gffread tpmcalculator lxml rsem fastp=0.23.2
+
+micromamba activate PGRP_Snakemake
+```
+
+> Conda fallback: replace `micromamba create` with `conda create` and `micromamba activate` with `conda activate`. The `-c` channel order is identical.
 ### Configuration
 
 Add ```config.json``` to the repo. This file controls various inputs to the workflow and must be updated by the user. A template for ```config.json``` is availble in the ```example/``` directory. 
@@ -172,9 +188,9 @@ The 12 species span all major land-plant clades (algae → bryophyte → lycophy
 ### Setup
 
 ```bash
-# 1. Install env once
-conda env create -f envs/bbduk.yaml
-conda activate pgrp-bbduk
+# 1. Install env once (micromamba preferred; replace with `conda` if needed)
+micromamba env create -f envs/bbduk.yaml
+micromamba activate pgrp-bbduk
 
 # 2. Build references once (~5 min, fetches 24 GenBank records via efetch + UniVec via curl)
 bash scripts/build_bbduk_refs.sh
