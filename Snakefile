@@ -63,13 +63,21 @@ else:
 # Write the tab-delimited file describing biological replicate relationships.
 # One line per replicate, not per run: several runs commonly share a replicate
 # and Trinity's --samples_file expects each replicate listed once.
+#
+# Written to config['rep_relations'] — the same path rules/deg.smk reads — so a
+# non-default setting no longer leaves the writer and the readers looking at
+# different files (issue #13). A file that disagrees with RunsByExperiment.tsv
+# was edited by hand and is left alone.
 try:
-	sample_table.write_replication_relationship(
+	rep_sync = sample_table.sync_replication_relationship(
 		SAMPLES_FILE.to_dict("records"),
-		sample_table.DEFAULT_REPLICATION_RELATIONSHIP,
+		config.get("rep_relations", sample_table.DEFAULT_REPLICATION_RELATIONSHIP),
 	)
 except sample_table.SampleTableError as err:
 	sys.exit(f"{err}\nExiting...")
+
+if rep_sync.status == "preserved":
+	sys.stderr.write(f"WARNING: {rep_sync.detail}\n")
 
 # Create sample output folders
 os.makedirs("output/logs/", exist_ok=True)

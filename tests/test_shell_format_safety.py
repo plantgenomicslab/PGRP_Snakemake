@@ -51,6 +51,11 @@ def _strip_prose(source: str) -> str:
     )
 
 
+def _scan(path):
+    """Yield (lineno, line) for a workflow source, prose stripped."""
+    return enumerate(_strip_prose(path.read_text()).splitlines(), 1)
+
+
 def _extract_function(source: str, name: str) -> str:
     """Return the source text of a top-level `def <name>(...)` block."""
     lines = source.splitlines()
@@ -101,6 +106,58 @@ class FlagstatCheckTests(unittest.TestCase):
         self.assertIn("exit 1", self.body)
 
 
+class GluedOptionTests(unittest.TestCase):
+    """A command built by `"... --flag" + value + "--next ..."` loses the spaces
+    around `value`, so the tool receives `--flagvalue--next` and never sees
+    either option. Costs nothing to spot statically; costs a whole pipeline run
+    to spot at runtime (issue #12)."""
+
+    # `--` must be followed by an alphanumeric to count as an option, so
+    # decorative dash runs ('--------Checking') are not mistaken for one.
+    #
+    # a long option flush against the closing quote of a concatenated literal
+    OPTION_THEN_CONCAT = re.compile(r'--[A-Za-z0-9][A-Za-z0-9_-]*"\s*\+')
+    # a long option flush against the opening quote after a concatenation
+    CONCAT_THEN_OPTION = re.compile(r'\+\s*"--[A-Za-z0-9][A-Za-z0-9_-]*')
+
+    def test_no_options_glued_to_concatenated_values(self):
+        violations = []
+        for path in _workflow_sources():
+            for lineno, line in _scan(path):
+                for pattern in (self.OPTION_THEN_CONCAT, self.CONCAT_THEN_OPTION):
+                    hit = pattern.search(line)
+                    if hit is not None:
+                        violations.append(
+                            f"{path.relative_to(_REPO_ROOT)}:{lineno} concatenates a "
+                            f"value directly onto {hit.group(0)!r} with no separating "
+                            f"space: {line.strip()!r}"
+                        )
+        self.assertEqual([], violations, "\n" + "\n".join(violations))
+
+    def test_decorative_dash_runs_are_not_options(self):
+        """flagstat_check's banner concatenates a path between dash runs; that
+        is not a glued option and must not be flagged."""
+        banner = '"echo \'--------Checking " + bam + "----------\' && "'
+        for pattern in (self.OPTION_THEN_CONCAT, self.CONCAT_THEN_OPTION):
+            self.assertIsNone(pattern.search(banner))
+
+    def test_patterns_catch_the_known_regression(self):
+        """The exact shape of issue #12, so the check cannot silently rot."""
+        glued = (
+            'shell("run_DE_analysis.pl --samples_file" + config["rep_relations"]'
+            ' + "--contrasts " + config["sample_contrast"] + " --output out")'
+        )
+        self.assertIsNotNone(self.OPTION_THEN_CONCAT.search(glued))
+        self.assertIsNotNone(self.CONCAT_THEN_OPTION.search(glued))
+
+        spaced = (
+            'shell("run_DE_analysis.pl --samples_file " + config["rep_relations"]'
+            ' + " --contrasts " + config["sample_contrast"] + " --output out")'
+        )
+        self.assertIsNone(self.OPTION_THEN_CONCAT.search(spaced))
+        self.assertIsNone(self.CONCAT_THEN_OPTION.search(spaced))
+
+
 class BraceGroupTests(unittest.TestCase):
     """No workflow source may use a bash brace group; use `if ! cmd; then ...
     fi` or a `( ... )` subshell instead."""
@@ -108,16 +165,16 @@ class BraceGroupTests(unittest.TestCase):
     BRACE_GROUP = re.compile(r"(?:\|\||&&)\s*\{(?!\{)")
 
     def test_no_bash_brace_groups(self):
+        violations = []
         for path in _workflow_sources():
-            source = _strip_prose(path.read_text())
-            for lineno, line in enumerate(source.splitlines(), 1):
-                with self.subTest(file=path.name, line=lineno):
-                    self.assertIsNone(
-                        self.BRACE_GROUP.search(line),
+            for lineno, line in _scan(path):
+                if self.BRACE_GROUP.search(line) is not None:
+                    violations.append(
                         f"{path.relative_to(_REPO_ROOT)}:{lineno} uses a bash brace "
                         f"group, which Snakemake's shell() parses as a format field: "
-                        f"{line.strip()!r}",
+                        f"{line.strip()!r}"
                     )
+        self.assertEqual([], violations, "\n" + "\n".join(violations))
 
 
 if __name__ == "__main__":

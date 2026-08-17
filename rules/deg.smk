@@ -30,11 +30,16 @@ rule DEG_HTseq:
 	log: "output/DEG/DEG_HTseq.log"
 	params:
 		 replication = os.path.join(os.getcwd(), config["rep_relations"]),
+		 sample_contrast = os.path.join(os.getcwd(), config["sample_contrast"]),
 		 matrix =  os.path.join(os.getcwd(), "output/counts/htseq/htseq-count.tsv")
 	threads: config["threads"]["DEG_HTseq"]
 	run:
 		# Compute differentially expressed genes based on deg_samples.txt
-		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file" + config["rep_relations"] + "--contrasts " + config["sample_contrast"] + " --output output/DEG")
+		# Built from params rather than string concatenation: the concatenated
+		# form was missing the spaces around the config values, so it assembled
+		# as '--samples_file<path>--contrasts' and run_DE_analysis.pl never saw
+		# either option (issue #12). Matches DEG_RSEM below.
+		shell("run_DE_analysis.pl --matrix {input.HTseq} --method DESeq2 --samples_file {params.replication} --contrasts {params.sample_contrast} --output output/DEG")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.001 -C 2")
 		shell("cd output/DEG && analyze_diff_expr.pl --samples {params.replication} --matrix {params.matrix} -P 0.01 -C 1")
 		shell("cd output/counts/htseq && PtR --matrix htseq-count.tsv --min_rowSums 10 -s {params.replication}  --log2 --CPM --sample_cor_matrix --CPM --center_rows --prin_comp 3")

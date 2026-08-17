@@ -189,7 +189,7 @@ If **running locally**, the 'Run' and 'Experiment' fields of ```RunsbyExperiment
 #### DE control files
 Differential expression needs a second control file, ```replication_relationship.txt``` (its path is set by ```rep_relations``` in ```config.yml```). It is the ```--samples_file``` handed to DESeq2 via Trinity: tab separated, first column the treatment, second column a replicate belonging to it, **one line per replicate**. Pairwise differentially expressed genes are computed for each combination of treatments.
 
-The pipeline regenerates this file from ```RunsByExperiment.tsv``` every time the Snakefile is parsed, so there is normally nothing to write by hand. To produce or inspect it up front — useful when setting up contrasts before committing to a full run — use:
+The pipeline regenerates this file from ```RunsByExperiment.tsv``` at the path given by ```rep_relations``` every time the Snakefile is parsed, so there is normally nothing to write by hand. To produce or inspect it up front — useful when setting up contrasts before committing to a full run — use:
 
 ```bash
 ./scripts/make_replication_relationship.py
@@ -199,6 +199,8 @@ The pipeline regenerates this file from ```RunsByExperiment.tsv``` every time th
 # non-default paths
 ./scripts/make_replication_relationship.py -i my_runs.tsv -o deg_samples.txt
 ```
+
+If you do want to maintain this file by hand — to analyse a subset of replicates, say — just edit it. Whenever its contents disagree with ```RunsByExperiment.tsv``` the pipeline treats it as yours, leaves it untouched, and prints a warning naming the differences rather than overwriting your edits. Delete the file (or pass ```--force``` to the script) to go back to a generated one.
 
 Note that ```RunsByExperiment.tsv``` holds one row per *run* while this file holds one row per *replicate*: runs sharing a replicate are collapsed to a single line.
 

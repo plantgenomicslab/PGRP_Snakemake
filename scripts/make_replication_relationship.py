@@ -43,22 +43,43 @@ def main(argv=None):
             f"(default: {sample_table.DEFAULT_REPLICATION_RELATIONSHIP})"
         ),
     )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="overwrite the output even if it looks hand-edited",
+    )
     args = parser.parse_args(argv)
 
     if not os.path.exists(args.input):
         parser.error(f"cannot find {args.input}")
 
     table = sample_table.load_sample_table(args.input)
+    rows = table.to_dict("records")
     try:
-        pairs = sample_table.write_replication_relationship(
-            table.to_dict("records"), args.output, args.input
-        )
+        if args.force:
+            pairs = sample_table.write_replication_relationship(
+                rows, args.output, args.input
+            )
+            status = "overwrote"
+        else:
+            result = sample_table.sync_replication_relationship(
+                rows, args.output, args.input
+            )
+            if result.status == "preserved":
+                print(result.detail, file=sys.stderr)
+                print("Re-run with --force to overwrite.", file=sys.stderr)
+                return 1
+            pairs = result.pairs
+            status = {"created": "wrote", "unchanged": "already current",
+                      "regenerated": "updated"}[result.status]
     except sample_table.SampleTableError as err:
         parser.error(str(err))
 
     treatments = len({treatment for treatment, _ in pairs})
     print(
-        f"Wrote {args.output}: {len(pairs)} replicates across {treatments} treatments"
+        f"{args.output}: {status} — {len(pairs)} replicates across "
+        f"{treatments} treatments"
     )
     return 0
 

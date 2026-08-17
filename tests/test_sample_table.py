@@ -14,6 +14,8 @@ Run from repo root:
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -117,6 +119,69 @@ class FormatTests(unittest.TestCase):
             st.format_replication_relationship(pairs),
             example.read_text(),
         )
+
+
+class SyncReplicationRelationshipTests(unittest.TestCase):
+    """Issue #13: the file must land on the configured `rep_relations` path,
+    without clobbering a hand-authored one."""
+
+    ROWS = [
+        {"Run": "r1", "Replicate": "ZT0_rep1", "Treatment": "ZT0"},
+        {"Run": "r2", "Replicate": "ZT0_rep1", "Treatment": "ZT0"},
+        {"Run": "r3", "Replicate": "ZT4_rep1", "Treatment": "ZT4"},
+    ]
+    GENERATED = "ZT0\tZT0_rep1\nZT4\tZT4_rep1\n"
+
+    def _sync(self, existing=None):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        target = Path(tmp) / "deg_samples.txt"
+        if existing is not None:
+            target.write_text(existing)
+        result = st.sync_replication_relationship(self.ROWS, str(target))
+        return result, target
+
+    def test_creates_the_file_when_absent(self):
+        result, target = self._sync()
+        self.assertEqual("created", result.status)
+        self.assertEqual(self.GENERATED, target.read_text())
+
+    def test_writes_to_the_configured_path_not_the_default(self):
+        result, target = self._sync()
+        self.assertEqual(str(target), result.path)
+        self.assertTrue(target.name.endswith("deg_samples.txt"))
+        self.assertFalse(
+            Path(target.parent, st.DEFAULT_REPLICATION_RELATIONSHIP).exists()
+        )
+
+    def test_leaves_an_already_correct_file_alone(self):
+        result, target = self._sync(existing=self.GENERATED)
+        self.assertEqual("unchanged", result.status)
+        self.assertEqual(self.GENERATED, target.read_text())
+
+    def test_rewrites_a_file_that_only_differs_by_duplicates(self):
+        """Migration case: files written by the pre-fix code repeated a
+        replicate once per run. Same set of pairs, so it is ours to clean up."""
+        stale = "ZT0\tZT0_rep1\nZT0\tZT0_rep1\nZT4\tZT4_rep1\n"
+        result, target = self._sync(existing=stale)
+        self.assertEqual("regenerated", result.status)
+        self.assertEqual(self.GENERATED, target.read_text())
+
+    def test_preserves_a_hand_authored_file(self):
+        """Different pairs mean a human edited it — never overwrite."""
+        handmade = "ZT0\tZT0_rep1\n"
+        result, target = self._sync(existing=handmade)
+        self.assertEqual("preserved", result.status)
+        self.assertEqual(handmade, target.read_text())
+
+    def test_preserved_result_explains_the_difference(self):
+        result, _ = self._sync(existing="ZT0\tZT0_rep1\n")
+        self.assertIn("ZT4_rep1", result.detail)
+
+    def test_tolerates_blank_lines_and_trailing_whitespace(self):
+        result, target = self._sync(existing="ZT0\tZT0_rep1\n\nZT4\tZT4_rep1\n\n")
+        self.assertEqual("regenerated", result.status)
+        self.assertEqual(self.GENERATED, target.read_text())
 
 
 if __name__ == "__main__":

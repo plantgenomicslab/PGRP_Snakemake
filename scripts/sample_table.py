@@ -17,6 +17,9 @@ pandas-dependent convenience.
 """
 from __future__ import annotations
 
+import os
+from typing import NamedTuple
+
 DEFAULT_SAMPLE_TABLE = "RunsByExperiment.tsv"
 DEFAULT_REPLICATION_RELATIONSHIP = "replication_relationship.txt"
 
@@ -82,10 +85,26 @@ def load_sample_table(path=DEFAULT_SAMPLE_TABLE):
     return pd.read_csv(path, sep="\t")
 
 
+def parse_replication_relationship(text):
+    """Parse an existing replication_relationship.txt into pairs.
+
+    Blank lines and surrounding whitespace are ignored so a hand-edited file
+    does not read as "different" over formatting alone.
+    """
+    pairs = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        treatment, _, replicate = line.partition("\t")
+        pairs.append((treatment.strip(), replicate.strip()))
+    return pairs
+
+
 def write_replication_relationship(
     rows, out_path=DEFAULT_REPLICATION_RELATIONSHIP, path=DEFAULT_SAMPLE_TABLE
 ):
-    """Write replication_relationship.txt from control-file rows.
+    """Write replication_relationship.txt from control-file rows, unconditionally.
 
     Returns the pairs written so callers can report or reuse them.
     """
@@ -95,3 +114,73 @@ def write_replication_relationship(
     with open(out_path, "w") as handle:
         handle.write(format_replication_relationship(pairs))
     return pairs
+
+
+class ReplicationSync(NamedTuple):
+    """Outcome of reconciling the on-disk file with the control file."""
+
+    status: str  # created | unchanged | regenerated | preserved
+    path: str
+    pairs: list
+    detail: str = ""
+
+
+def sync_replication_relationship(
+    rows, out_path=DEFAULT_REPLICATION_RELATIONSHIP, path=DEFAULT_SAMPLE_TABLE
+):
+    """Reconcile `out_path` with what the control file describes.
+
+    Writes to the caller-supplied path — normally `config["rep_relations"]`,
+    which the readers in rules/deg.smk use — instead of a hard-coded filename
+    (issue #13).
+
+    A file whose pairs differ from the generated set was edited by hand, so it
+    is left untouched and reported back rather than silently overwritten. Files
+    that merely repeat a replicate once per run — what the pre-fix code wrote —
+    describe the same set and are rewritten in de-duplicated form.
+    """
+    rows = list(rows)
+    group_column = resolve_group_column(rows[0].keys() if rows else [], path)
+    pairs = replication_pairs(rows, group_column)
+    rendered = format_replication_relationship(pairs)
+
+    if not os.path.exists(out_path):
+        _write(out_path, rendered)
+        return ReplicationSync("created", out_path, pairs)
+
+    with open(out_path) as handle:
+        existing_text = handle.read()
+    existing = parse_replication_relationship(existing_text)
+
+    if set(existing) != set(pairs):
+        only_generated = sorted(set(pairs) - set(existing))
+        only_existing = sorted(set(existing) - set(pairs))
+        detail = (
+            f"{out_path} does not match {path} and looks hand-edited, so it was "
+            f"left as-is. Missing from the file: "
+            f"{_summarise(only_generated) or '<none>'}. "
+            f"Present only in the file: {_summarise(only_existing) or '<none>'}. "
+            f"Delete it to regenerate, or point rep_relations elsewhere."
+        )
+        return ReplicationSync("preserved", out_path, existing, detail)
+
+    if existing_text == rendered:
+        return ReplicationSync("unchanged", out_path, pairs)
+
+    _write(out_path, rendered)
+    return ReplicationSync("regenerated", out_path, pairs)
+
+
+def _write(out_path, text):
+    parent = os.path.dirname(out_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(out_path, "w") as handle:
+        handle.write(text)
+
+
+def _summarise(pairs, limit=5):
+    shown = ", ".join(f"{treatment}/{replicate}" for treatment, replicate in pairs[:limit])
+    if len(pairs) > limit:
+        shown += f", ... (+{len(pairs) - limit} more)"
+    return shown

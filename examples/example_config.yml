@@ -20,7 +20,8 @@ RSEM_prepared_genome: placeholder     # (path) RSEM prepared reference genome...
 runDEG: yes                           # [yes|no] Whether to perform DEG analysis using Trinity
                                       # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
 sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated
-rep_relations: replication_relationship.txt  # (path) Treatment/Replicate relationships. Generated from RunsByExperiment.tsv; see scripts/make_replication_relationship.py
+rep_relations: replication_relationship.txt  # (path) Treatment/Replicate relationships, written here from RunsByExperiment.tsv on every run.
+                                      # Hand-edited files are detected and preserved; see scripts/make_replication_relationship.py
 
 #############################################################################################
 # Threads 
