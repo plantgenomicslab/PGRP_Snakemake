@@ -5,15 +5,26 @@
 # standard deviations among replicates. Treatment/replicate relationships
 # are defined by the sraRunsbyExperiment.tsv input file.
 
+import os
 import pandas as pd
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sample_table
 
 gene_index = sys.argv[1]
 COUNTS_FILE = sys.argv[2]
 counts = pd.read_csv(COUNTS_FILE, sep="\t", index_col=gene_index)
 
-SAMPLES_FILE = pd.read_csv("RunsByExperiment.tsv", sep="\t")
-REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Sample")['Replicate'].unique().apply(list).to_dict()
+SAMPLES_FILE = sample_table.load_sample_table()
+# Accepts either 'Treatment' (canonical) or the legacy 'Sample' header — this
+# script used to hard-code 'Sample' while the Snakefile hard-coded 'Treatment',
+# so one control file could not satisfy both (issue #9).
+try:
+    GROUP_COLUMN = sample_table.resolve_group_column(SAMPLES_FILE.columns)
+except sample_table.SampleTableError as err:
+    sys.exit(f"{err}\nExiting...")
+REPLICATE_LOOKUP = SAMPLES_FILE.groupby(GROUP_COLUMN)['Replicate'].unique().apply(list).to_dict()
 
 averages = pd.DataFrame()
 stdDevs = pd.DataFrame()

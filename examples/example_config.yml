@@ -11,14 +11,17 @@ PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read
 
 genomeDir: placeholder                # (path) Reference genome directory
 GTFname: placeholder                  # (path) Path to GTF file for STAR alignment
-ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
+# 'ref' (STAR index files to sanity-check) defaults to [SA, SAindex,
+# exonGeTrInfo.tab]; set it only to override that list.
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
 RSEM_prepared_genome: placeholder     # (path) RSEM prepared reference genome...without extension (list includes RSEM)
 
 runDEG: yes                           # [yes|no] Whether to perform DEG analysis using Trinity
                                       # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
-sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated 
+sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated
+rep_relations: replication_relationship.txt  # (path) Treatment/Replicate relationships, written here from RunsByExperiment.tsv on every run.
+                                      # Hand-edited files are detected and preserved; see scripts/make_replication_relationship.py
 
 #############################################################################################
 # Threads 

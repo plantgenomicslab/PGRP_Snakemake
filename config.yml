@@ -11,7 +11,9 @@ PAIR_LIST: [_1, _2]                   # Unique suffixes used for paired-end read
 
 genomeDir: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref # Base genome folder
 GTFname: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/genome.gtf # location of gtf file
-ref: [SA, SAindex, exonGeTrInfo.tab]  # Files to check for successful STAR reference preparation
+# 'ref' (the list of STAR index files to sanity-check) is no longer required:
+# STAR always writes SA, SAindex and exonGeTrInfo.tab, so the pipeline defaults
+# to those. Set it here only to override that list.
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
 RSEM_prepared_genome: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snakemake/ref/rsem_prep # PATH and prefix of RSEM reference
@@ -19,7 +21,8 @@ RSEM_prepared_genome: /data/gpfs/assoc/pgl/data/iceplant/rna-seq/USDS/PGRP_Snake
 runDEG: no                           # [yes|no] Whether to perform DEG analysis using Trinity
                                       # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
 sample_contrast: placeholder          # (path) DEG contrasts to perform. If not included, all contrasts are calculated. Example is in ./example folder
-rep_relations: replication_relationship.txt  # (path of replication_relationship.txt) Treatment/Replicate relationships file between. Created from RunsbyExperiment.tsv by default.
+rep_relations: replication_relationship.txt  # (path) Treatment/Replicate relationships, written here from RunsByExperiment.tsv on every run.
+                                      # A file whose contents disagree with RunsByExperiment.tsv is treated as hand-edited and left alone.
 
 #############################################################################################
 # Threads 

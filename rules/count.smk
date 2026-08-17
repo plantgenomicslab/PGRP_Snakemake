@@ -94,7 +94,11 @@ rule normalizeHTseq:
 	threads: config["threads"]["normalizeHTseq"]
 	run:
 		# Generate exon lengths from gtf file
-		shell("./scripts/calc_cdna_len.py " + config["GTFname"] + " gene_id > " + config["genomeDir"] + "cds_length.tsv")
+		# os.path.join, not concatenation: genomeDir is documented without a
+		# trailing slash (Snakefile joins it with an explicit '/'), so gluing the
+		# filename on wrote cds_length.tsv *beside* the index directory as
+		# 'refcds_length.tsv'. normalizeCounts.py joins the same way.
+		shell("./scripts/calc_cdna_len.py " + config["GTFname"] + " gene_id > " + os.path.join(config["genomeDir"], "cds_length.tsv"))
 		# Compute TPM and FPKM values HTseq raw counts
 		shell("python scripts/normalizeCounts.py HTseq " + config["GTFname"] + " {input} output/counts/htseq/htseq-count " + config["genomeDir"])
 
