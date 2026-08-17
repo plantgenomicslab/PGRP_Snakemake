@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import pandas as pd
 import sys
 
@@ -19,7 +20,8 @@ if mode == "HTseq":
     counts = counts[:-5]
     
     # Load exon lengths
-    gene_length = pd.read_csv(ref_dir + "cds_length.tsv", header=None, sep="\t")
+    # Joined, not concatenated — must match how rules/count.smk writes it.
+    gene_length = pd.read_csv(os.path.join(ref_dir, "cds_length.tsv"), header=None, sep="\t")
     gene_length.columns = ["Geneid", "Length"]
     gene_length = gene_length.set_index("Geneid")
     print(gene_length.head())

@@ -158,6 +158,43 @@ class GluedOptionTests(unittest.TestCase):
         self.assertIsNone(self.CONCAT_THEN_OPTION.search(spaced))
 
 
+class GluedPathTests(unittest.TestCase):
+    """`genomeDir` is documented without a trailing slash — the Snakefile joins
+    it with an explicit '/'. Concatenating a bare filename onto it therefore
+    lands the file beside the index directory (`.../refcds_length.tsv`) instead
+    of inside it. Writer and reader agreed, so nothing crashed; it just wrote to
+    a surprising place and needed write access one level up."""
+
+    # a directory-valued config key glued straight onto a filename literal
+    GLUED_DIR = re.compile(r'config\[[\'"]genomeDir[\'"]\]\s*\+\s*"(?![\s/])')
+    # the reader side, which takes the same directory as argv
+    GLUED_REF_DIR = re.compile(r'\bref_dir\s*\+\s*"(?![\s/])')
+
+    def _sources(self):
+        return _workflow_sources() + [_REPO_ROOT / "scripts" / "normalizeCounts.py"]
+
+    def test_reference_dir_is_joined_not_concatenated(self):
+        violations = []
+        for path in self._sources():
+            for lineno, line in _scan(path):
+                for pattern in (self.GLUED_DIR, self.GLUED_REF_DIR):
+                    if pattern.search(line) is not None:
+                        violations.append(
+                            f"{path.relative_to(_REPO_ROOT)}:{lineno} glues a filename "
+                            f"onto a directory path; use os.path.join: {line.strip()!r}"
+                        )
+        self.assertEqual([], violations, "\n" + "\n".join(violations))
+
+    def test_pattern_catches_the_known_regression(self):
+        self.assertIsNotNone(
+            self.GLUED_DIR.search('config["genomeDir"] + "cds_length.tsv"')
+        )
+        self.assertIsNotNone(self.GLUED_REF_DIR.search('ref_dir + "cds_length.tsv"'))
+        # a separating space or slash is fine
+        self.assertIsNone(self.GLUED_DIR.search('config["genomeDir"] + " --flag"'))
+        self.assertIsNone(self.GLUED_DIR.search('config["genomeDir"] + "/cds_length.tsv"'))
+
+
 class BraceGroupTests(unittest.TestCase):
     """No workflow source may use a bash brace group; use `if ! cmd; then ...
     fi` or a `( ... )` subshell instead."""
