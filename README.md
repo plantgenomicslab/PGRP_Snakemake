@@ -122,7 +122,41 @@ The pipeline requires the user to create a control file called ```RunsByExperime
 
 ```RunsByExperiment.tsv``` provides the pipleline with information about the data that you want to process. These can be either SRA runs or locally stored data. When downloading SRA data, there may be multiple SRA runs (SRR...) for each SRA experiment (SRX...) where experiments represents the sequencing performed on a particular sample. Experiments should be given meainingful titles to aid in the interpretation of the pipeline output. Finally, the relationships between replicates and treatments should be flushed out for count aggregation and DEG analysis.
 
-For local analysis ```scripts/Experiment_name_composer.py``` script takes an input folder and an optional output file name as command-line arguments. It generates a list of sample names from files with specific extensions in the input folder, removes any _rep* or _Rep* suffixes from the sample names, and creates an output file with columns for Run, Replicate, and Sample. The Run and Replicate columns contain the original sample name, while the Sample column contains the cleaned sample name without the _rep* or _Rep* suffix.
+#### Columns
+
+| Column | Required | Meaning |
+|--------|----------|---------|
+| `Run` | yes | One sequencing run. For local data, the fastq file prefix. |
+| `Experiment` | no | SRA experiment accession (SRX...). May be omitted for local data. |
+| `Replicate` | yes | Biological replicate a run belongs to. Several runs may share one replicate. |
+| `Treatment` | yes | Condition/group a replicate belongs to. Contrasts are computed between treatments. |
+
+The treatment column is named `Treatment`. Control files written before this was
+standardised used `Sample` for the same field; that name is still accepted, but
+`Treatment` is what the examples and the generator scripts produce.
+
+#### Generating the control file
+
+Two generators are provided for local data — pick the one that matches your file
+naming. Both write to the current directory.
+
+```bash
+# Paired-end reads named '<treatment>_rep<N>_R1.fastq.gz' / '..._R2.fastq.gz'.
+# Also writes a pairwise sample_contrasts file covering every treatment pair.
+./scripts/create_RunsbyExperiment.py /path/to/reads
+#   -> RunsByExperiment_<timestamp>.tsv   (Run, Treatment, Replicate, Sample)
+#   -> sample_contrasts_<timestamp>.tsv   (one treatment pair per line)
+# Rename/point config.yml at these before running the pipeline.
+
+# Any .fq/.fastq/.fq.gz/.fastq.gz naming. Strips a trailing _rep<N>/_Rep<N>
+# from each file prefix to derive the treatment name.
+python scripts/Experiment_name_composer.py /path/to/reads [output.tsv]
+#   -> RunsByExperiment.tsv               (Run, Replicate, Treatment)
+```
+
+`Experiment_name_composer.py` puts the original file prefix in both `Run` and
+`Replicate`, and the prefix with the `_rep*`/`_Rep*` suffix removed in
+`Treatment`.
 
 ```
 # Example format of RunsbyExperiment.tsv
@@ -153,11 +187,24 @@ Because these files can tedious to generate for projects with many samples, a sc
 If **running locally**, the 'Run' and 'Experiment' fields of ```RunsbyExperiment.tsv``` may be omitted. The 'Replicate' field should represent the prefixes of all fastq files to be included in the analysis. 'Treatment' then should be the desired name of the treatment to which each replicate belongs. Make sure to update ```config.json``` with the nomenclature for paired-ends. 
 
 #### DE control files
-Another optional control file called ```replication_relationship.txt``` must be created if differential expression analysis is desired. If the file is missing then DE analysis will not be performed. ```replication_relationship.txt``` provides tab separated contrasts to be used in differential gene expression analysis using DESeq2. The first column defines treatments and the second column defines replicates associated with each treatment. Pairwise differentially expressed genes will be computed for each combination of treatments. See ```example/``` for an example:
+Differential expression needs a second control file, ```replication_relationship.txt``` (its path is set by ```rep_relations``` in ```config.yml```). It is the ```--samples_file``` handed to DESeq2 via Trinity: tab separated, first column the treatment, second column a replicate belonging to it, **one line per replicate**. Pairwise differentially expressed genes are computed for each combination of treatments.
+
+The pipeline regenerates this file from ```RunsByExperiment.tsv``` every time the Snakefile is parsed, so there is normally nothing to write by hand. To produce or inspect it up front — useful when setting up contrasts before committing to a full run — use:
+
+```bash
+./scripts/make_replication_relationship.py
+#   reads  RunsByExperiment.tsv
+#   writes replication_relationship.txt
+
+# non-default paths
+./scripts/make_replication_relationship.py -i my_runs.tsv -o deg_samples.txt
+```
+
+Note that ```RunsByExperiment.tsv``` holds one row per *run* while this file holds one row per *replicate*: runs sharing a replicate are collapsed to a single line.
 
 ```
 # Example format of replication_relationship.txt
-cat deg_samples.txt
+cat replication_relationship.txt
 
 ZT0	ZT0_rep1
 ZT0	ZT0_rep2

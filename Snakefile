@@ -3,8 +3,14 @@ import sys
 
 import pandas as pd
 
+# Shared control-file parsing (see scripts/sample_table.py). Resolved against the
+# working directory, matching how the rules invoke ./scripts/*.py, but pinned to
+# an absolute path so a later chdir cannot break the import.
+sys.path.insert(0, os.path.abspath("scripts"))
+import sample_table
+
 # Load run and sample information from the sraRunsByExperiment.tsv input file (user must provide)
-SAMPLES_FILE = pd.read_csv("RunsByExperiment.tsv", sep="\t")
+SAMPLES_FILE = sample_table.load_sample_table()
 SAMPLE_LIST = list(set(SAMPLES_FILE["Run"].values.tolist()))
 REPLICATE_LIST = list(set(SAMPLES_FILE["Replicate"].tolist()))
 REPLICATE_LOOKUP = SAMPLES_FILE.groupby("Replicate")['Run'].apply(list).to_dict()
@@ -29,7 +35,12 @@ if "RSEM" in config["readCounting"]:
 	if not os.path.exists(f"{config['RSEM_prepared_genome']}.seq"):
 		sys.exit(f"Cannot locate '{config['RSEM_prepared_genome']}'.\nProvide a reference genome prepared with 'rsem-prepare-reference' to use RSEM.\nExiting...")
 
-for ref in config["ref"]:
+# STAR always writes these three files into the index directory, so there is
+# nothing for the user to configure. `ref` in config.yml stays supported as an
+# override for anyone who pinned it (issue #9).
+STAR_INDEX_SENTINELS = ["SA", "SAindex", "exonGeTrInfo.tab"]
+
+for ref in config.get("ref", STAR_INDEX_SENTINELS):
 	if not os.path.exists(f"{config['genomeDir']}/{ref}"):
 		sys.exit("The " + ref + " file is missing.\nHave you provided the correct paths to a reference genome indexed by STAR?\nExiting...")
 
@@ -49,12 +60,16 @@ else:
 	cTop = ""
 	cBottom = ""
 
-# create the Sample tab-delimited text file indicating biological replicate relationships
-replicate_relationship= ""
-for index, row in SAMPLES_FILE.iterrows():
-	replicate_relationship += f"{row['Treatment']}\t{row['Replicate']}\n"
-	with open('replication_relationship.txt', 'w') as f:
-		f.write(replicate_relationship)
+# Write the tab-delimited file describing biological replicate relationships.
+# One line per replicate, not per run: several runs commonly share a replicate
+# and Trinity's --samples_file expects each replicate listed once.
+try:
+	sample_table.write_replication_relationship(
+		SAMPLES_FILE.to_dict("records"),
+		sample_table.DEFAULT_REPLICATION_RELATIONSHIP,
+	)
+except sample_table.SampleTableError as err:
+	sys.exit(f"{err}\nExiting...")
 
 # Create sample output folders
 os.makedirs("output/logs/", exist_ok=True)
@@ -165,12 +180,21 @@ localrules: all, importRaw_PAIRED, importRaw_SINGLE
 
 
 def flagstat_check(output, log):
-	"""Run `samtools flagstat` against a BAM and abort the rule on failure."""
+	"""Run `samtools flagstat` against a BAM and abort the rule on failure.
+
+	The command is assembled by concatenation and must stay free of literal
+	braces. Snakemake runs str.format() over everything handed to shell(), so a
+	bash brace group (`cmd || { ...; }`) is parsed as a format field and raises
+	NameError at runtime — see issue #11.
+	"""
+	bam = str(output)
 	shell(
-		"echo '--------Checking " + str(output) + "----------' && "
-		"samtools flagstat " + str(output) + " "
-		"|| { echo 'samtools flagstat found errors in " + str(output) + ". "
-		"Check log here: " + str(log) + ". Exiting......' >&2 ; exit 1; }"
+		"echo '--------Checking " + bam + "----------' && "
+		"if ! samtools flagstat " + bam + "; then "
+		"echo 'samtools flagstat found errors in " + bam + ". "
+		"Check log here: " + str(log) + ". Exiting......' >&2; "
+		"exit 1; "
+		"fi"
 	)
 
 rule all:

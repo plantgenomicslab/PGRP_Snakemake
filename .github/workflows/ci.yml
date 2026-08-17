@@ -16,6 +16,10 @@ jobs:
           python-version: "3.10"
       - name: Run aggregate_bbduk_stats unit tests
         run: python3 tests/test_aggregate_stats.py -v
+      - name: Run shell() format-safety tests
+        run: python3 tests/test_shell_format_safety.py -v
+      - name: Run sample_table unit tests
+        run: python3 tests/test_sample_table.py -v
 
   bash-syntax:
     name: Bash syntax check
