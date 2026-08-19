@@ -309,6 +309,36 @@ sbatch --mem=4g \
        -e snakemake.err \
        --wrap="./run.sh"
 ```
+## Upgrading an existing checkout
+
+If you already have a working directory with results in it, pulling is safe for your data but needs one manual step.
+
+**`config.yml` is tracked by git.** Your copy almost certainly has local edits (your `genomeDir`, `GTFname`, `rawInputDir`, `RSEM_prepared_genome`), and upstream changes touch the same region, so a plain `git pull` will refuse or conflict:
+
+```bash
+git status                 # confirm what is locally modified
+git stash push -m pre-pull
+git pull
+git stash pop              # if config.yml conflicts, keep YOUR values
+```
+
+You do **not** need to adopt the upstream `config.yml`. The only functional change there is that `ref:` became optional — leaving your existing `ref:` line in place works exactly as before.
+
+**Nothing else needs touching.** `RunsByExperiment.tsv` and `replication_relationship.txt` are untracked, and `output/` and `.snakemake/` are gitignored, so a pull cannot disturb finished results. Completed alignments are preserved and will not re-run.
+
+Then resume normally:
+
+```bash
+bash run.sh
+```
+
+`run.sh` already passes `--rerun-incomplete`. If the previous run was killed and you get `Directory cannot be locked`, run `snakemake --unlock --snakefile Snakefile` once first.
+
+Two things you may notice on the next run:
+
+- **`replication_relationship.txt` gets shorter.** It used to list one line per sequencing *run*, so replicates spanning several runs appeared more than once. It is now one line per replicate. If you have edited the file by hand, the pipeline detects that its contents disagree with `RunsByExperiment.tsv`, leaves it alone, and prints a warning naming the differences — delete the file, or run `scripts/make_replication_relationship.py --force`, to go back to a generated one.
+- **A stray `refcds_length.tsv` next to your reference directory.** HTseq normalization used to write `cds_length.tsv` by gluing the filename onto `genomeDir`, landing it one level up. It now goes inside `genomeDir`. The old file is orphaned and can be deleted.
+
 ## error checking
 
 # Slurm accounting for both jobs
