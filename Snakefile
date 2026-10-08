@@ -26,6 +26,20 @@ if LAYOUT == "PAIRED":
 else:
 	PAIR_LIST = ["_1", "_2"]
 
+# Library strandedness, applied to every read counter. dUTP / Illumina TruSeq
+# stranded libraries are "reverse". `RSEM_strandedness` is accepted as an older
+# name for the same setting.
+STRANDEDNESS = config.get("strandedness", config.get("RSEM_strandedness", "none"))
+STRAND_OPTIONS = {
+	# setting: rsem-calculate-expression --strandedness, featureCounts -s, htseq-count --stranded
+	"none": {"rsem": "none", "featureCounts": "0", "htseq": "no"},
+	"forward": {"rsem": "forward", "featureCounts": "1", "htseq": "yes"},
+	"reverse": {"rsem": "reverse", "featureCounts": "2", "htseq": "reverse"},
+}
+if STRANDEDNESS not in STRAND_OPTIONS:
+	sys.exit(f"strandedness must be one of none|forward|reverse, got '{STRANDEDNESS}'.\nExiting...")
+STRAND_FLAGS = STRAND_OPTIONS[STRANDEDNESS]
+
 # Align input routing (trim vs bbduk) lives in its own module.
 # Also conditionally pulls in rules/bbduk_filter.smk when bbduk_enable is true.
 include: "rules/align_inputs.smk"

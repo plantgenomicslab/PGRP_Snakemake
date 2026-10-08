@@ -30,12 +30,15 @@ rule featureCounts:
 		cleaned = "output/counts/featureCounts/featureCount_clean.cnt"
 	log: "output/counts/featureCounts/featureCounts.log"
 	threads: config["threads"]["featureCount"]
+	params:
+		strand = STRAND_FLAGS["featureCounts"],
 	run:
 		# Calculate raw counts from all sample-level bam files
 		shell("featureCounts \
 				-o {output.raw} \
 				-T {threads} \
 				-Q 1 \
+				-s {params.strand} \
 				-p -M \
 				-g gene_id \
 				-a " + config["GTFname"] + " {input} \
@@ -51,13 +54,15 @@ rule HTseq:
 	output: "output/counts/htseq/htseq-count.tsv"
 	log: "output/counts/htseq/HTseq.log"
 	threads: config["threads"]["HTseq"]
+	params:
+		stranded = STRAND_FLAGS["htseq"],
 	run:
 		# Compute raw gene-wise counts
 		shell("htseq-count \
 				 --format bam \
 				 --order pos \
 				 --mode union \
-				--stranded=no \
+				--stranded={params.stranded} \
 				 --type exon \
 				 --idattr gene_id \
 				 --nprocesses {threads} \

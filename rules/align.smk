@@ -25,6 +25,9 @@ rule alignRSEM:
 	log: "output/{replicate}/{sample}/logs/{sample}_alignRSEM.log"
 	threads: config["threads"]["align"]
 	run:
+		# --quantTranscriptomeSAMoutput needs STAR >= 2.7.11a, which removed the
+		# old --quantTranscriptomeBan IndelSoftclipSingleend spelling of the same
+		# setting (STAR exits with 'unrecognized parameter name').
 		shell("STAR --runMode alignReads --runThreadN {threads} \
 			--outFilterMultimapNmax 10 --alignIntronMin 25 --alignIntronMax 25000 \
 			--limitBAMsortRAM 20000000000 \
@@ -32,9 +35,10 @@ rule alignRSEM:
 			--genomeDir " + config["genomeDir"]  + " \
 			--readFilesCommand gunzip -c --readFilesIn {input} \
 			--outSAMtype BAM SortedByCoordinate --quantMode TranscriptomeSAM \
-			--quantTranscriptomeBan IndelSoftclipSingleend  \
+			--quantTranscriptomeSAMoutput BanSingleEnd_BanIndels_ExtendSoftclip  \
 			--alignEndsType EndToEnd  \
-			--outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.xs.bam")
+			--outFileNamePrefix output/{wildcards.replicate}/{wildcards.sample}/bam/{wildcards.sample}.xs.bam \
+			2> {log}")
 
 def mergeInputRSEM(wildcards):
 	inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.xs.bamAligned.toTranscriptome.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])
@@ -68,9 +72,10 @@ rule calculateRSEMExpression:
 	threads: config["threads"]["calculateRSEMExpression"]
 	params:
 		paired = "--paired-end" if LAYOUT == "PAIRED" else "",
+		strandedness = STRAND_FLAGS["rsem"],
 	run:
 		shell("rsem-calculate-expression --bam --no-bam-output -p {threads} \
-			{params.paired} {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
+			--strandedness {params.strandedness} {params.paired} {input} " + config["RSEM_prepared_genome"] + " output/counts/RSEM/{wildcards.replicate}")
 
 def mergeInputSTAR(wildcards):
 	inputs = expand("output/" + wildcards.replicate + "/{sample}/bam/{sample}.bamAligned.sortedByCoord.out.bam", sample=REPLICATE_LOOKUP[wildcards.replicate])

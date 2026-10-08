@@ -42,8 +42,8 @@ rule trim_PAIRED:
 		--json output/{wildcards.replicate}/{wildcards.sample}/trim/{wildcards.sample}.fastp.json \
 		-i {input.fwd_fastq} -I  {input.rev_fastq} \
 		-o {output.fwd_fastq} -O {output.rev_fastq} 2> {log}")
-		# Run quality control on trimmed reads
-		shell("fastqc --threads {threads} {output} --outdir output/{wildcards.replicate}/{wildcards.sample}/trim 2> {log}")
+		# Run quality control on trimmed reads; append so fastp's report survives
+		shell("fastqc --threads {threads} {output} --outdir output/{wildcards.replicate}/{wildcards.sample}/trim 2>> {log}")
 
 rule trim_SINGLE:
 	input: "output/{replicate}/{sample}/raw/{sample}.fastq.gz"
@@ -61,6 +61,6 @@ rule trim_SINGLE:
 		--json output/{wildcards.replicate}/{wildcards.sample}/trim/{wildcards.sample}.fastp.json \
 		-i {input} \
 		-o {output} 2> {log}")
-		# Run quality control on trimmed reads
-		shell("fastqc --threads {threads} {output} --outdir output/{wildcards.replicate}/{wildcards.sample}/trim 2> {log}")
+		# Run quality control on trimmed reads; append so fastp's report survives
+		shell("fastqc --threads {threads} {output} --outdir output/{wildcards.replicate}/{wildcards.sample}/trim 2>> {log}")
 

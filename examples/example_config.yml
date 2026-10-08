@@ -16,6 +16,8 @@ GTFname: placeholder                  # (path) Path to GTF file for STAR alignme
 
 readCounting: [RSEM]                  # (list) Read counting methods to use. Options are (RSEM|featureCounts|HTseq|TPMcalculator)
 RSEM_prepared_genome: placeholder     # (path) RSEM prepared reference genome...without extension (list includes RSEM)
+strandedness: none                    # [none|forward|reverse] library strandedness, used by RSEM, featureCounts and HTseq
+                                      # dUTP / Illumina TruSeq stranded = reverse. Unstranded = none.
 
 runDEG: yes                           # [yes|no] Whether to perform DEG analysis using Trinity
                                       # NOTE: DEG anlaysis will be perfromed with all selected read counting methods except TPMcalculator
@@ -52,6 +54,8 @@ threads:
 # Cluster
 # Configuration required
 #############################################################################################
+# Each block below is looked up by *rule name* (snakemake --cluster-config). A key that
+# matches no rule is silently ignored and that rule falls back to __default__.
 
 __default__:
   account: placeholder    # Provide your slurm account
@@ -66,10 +70,10 @@ __default__:
 fetchSRA:
   ncpus: 2
   memory: 8g
-importRaw_paired:
+importRaw_PAIRED:
   ncpus: 2
   memory: 8g
-importRaw_single:
+importRaw_SINGLE:
   ncpus: 2
   memory: 8g
 convertSRAtoFastq_SINGLE:
@@ -84,28 +88,13 @@ fastqc_raw_SINGLE:
 fastqc_raw_PAIRED:
   ncpus: 2
   memory: 8g
-fastqc_raw:
-  ncpus: 2
-  memory: 8g
 trim_SINGLE:
   ncpus: 16
   memory: 64g
 trim_PAIRED:
   ncpus: 16
   memory: 64g
-fastqc_trim_SINGLE:
-  ncpus: 2
-  memory: 8g
-fastqc_trim_PAIRED:
-  ncpus: 2
-  memory: 8g
-align_SINGLE:
-  ncpus: 16
-  memory: 64g
-align_PAIRED:
-  ncpus: 16
-  memory: 64g
-alignSTAR:
+align:
   ncpus: 16
   memory: 64g
 alignRSEM:
@@ -114,7 +103,10 @@ alignRSEM:
 calculateRSEMExpression:
   ncpus: 16
   memory: 64g
-merge:
+mergeSTAR:
+  ncpus: 16
+  memory: 64g
+mergeRSEM:
   ncpus: 16
   memory: 64g
 featureCounts:
@@ -144,7 +136,13 @@ DEG_HTseq:
 DEG_RSEM:
   ncpus: 8
   memory: 64g
-summarize:
+summarizeFeatureCounts:
+  ncpus: 2
+  memory: 8g
+summarizeHTseq:
+  ncpus: 2
+  memory: 8g
+summarizeTPMCalc:
   ncpus: 2
   memory: 8g
 summarizeRSEM:

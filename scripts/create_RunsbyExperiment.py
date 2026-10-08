@@ -3,7 +3,9 @@ import pandas as pd
 import sys
 import datetime
 import argparse
-from itertools import combinations
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sample_table
 
 def create_table(directory):
     df_list = []  # create an empty list to store each row as a DataFrame
@@ -28,8 +30,16 @@ def create_table(directory):
     return df
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='This script generates RunsByExperiment and **SAMPLE** sample_contrasts files from a given directory.')
+    parser = argparse.ArgumentParser(
+        description='This script generates RunsByExperiment and **SAMPLE** sample_contrasts files from a given directory.',
+        epilog='Each sample_contrasts line "A<TAB>B" yields log2FoldChange = log2(A/B) in the '
+               'Trinity/DESeq2 output, so the treatment belongs first and the control second. '
+               'Without --reference pairs are written in alphabetical order; check the '
+               'direction and edit the file before running DEG analysis.')
     parser.add_argument('directory', help='The directory where the files are located.')
+    parser.add_argument('--reference', metavar='TREATMENT',
+                        help='Control/reference treatment: written second in every pair '
+                             'that contains it, so its fold changes read "vs TREATMENT".')
     args = parser.parse_args()
     
     df = create_table(args.directory)
@@ -37,15 +47,17 @@ if __name__ == "__main__":
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     df.to_csv(f'RunsByExperiment_{timestamp}.tsv', sep='\t', index=False)
 
-    # Pairwise comparisons for sample contrast
-    #pairwise_df = pd.DataFrame(list(combinations(df['experiment'], 2)), columns=['Sample1', 'Sample2'])
-    #pairwise_df = pd.DataFrame(list(combinations(df['Experiment'], 2)), header=FALSE)
-    #pairwise_df.to_csv(f'output_pairwise_{timestamp}.tsv', sep='\t', index=False)
-    # create_table() emits 'Treatment', never 'Experiment' — pairing off the
-    # latter raised KeyError before every run reached this point.
-    # combinations() over the *unique* treatments already yields each unordered
-    # pair once and never pairs a treatment with itself.
-    pairwise_combinations = list(combinations(sorted(df['Treatment'].unique()), 2))
+    # Pairwise comparisons for sample contrast.
+    # Trinity's DESeq2 contrast for a line 'A<TAB>B' is log2(A/B); see
+    # sample_table.pairwise_contrasts for how the direction is chosen.
+    try:
+        pairwise_combinations = sample_table.pairwise_contrasts(df['Treatment'], args.reference)
+    except sample_table.SampleTableError as exc:
+        sys.exit(f"ERROR: {exc}")
     pairwise_df = pd.DataFrame(pairwise_combinations, columns=['Sample1', 'Sample2'])
-    pairwise_df.sort_values(by=['Sample1', 'Sample2'], inplace=True)
-    pairwise_df.to_csv(f'sample_contrasts_{timestamp}.tsv', sep='\t', index=False, header=False)
+    contrasts_path = f'sample_contrasts_{timestamp}.tsv'
+    pairwise_df.to_csv(contrasts_path, sep='\t', index=False, header=False)
+    if args.reference is None:
+        print(f"NOTE: {contrasts_path} lists pairs alphabetically. Line 'A<TAB>B' gives "
+              "log2FC = log2(A/B): put the treatment first, or re-run with --reference <control>.",
+              file=sys.stderr)

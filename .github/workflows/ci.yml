@@ -20,6 +20,8 @@ jobs:
         run: python3 tests/test_shell_format_safety.py -v
       - name: Run sample_table unit tests
         run: python3 tests/test_sample_table.py -v
+      - name: Run workflow/config consistency tests
+        run: python3 tests/test_workflow_config.py -v
 
   bash-syntax:
     name: Bash syntax check

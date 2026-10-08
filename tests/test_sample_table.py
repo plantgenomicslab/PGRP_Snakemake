@@ -184,5 +184,31 @@ class SyncReplicationRelationshipTests(unittest.TestCase):
         self.assertEqual(self.GENERATED, target.read_text())
 
 
+class PairwiseContrastsTests(unittest.TestCase):
+    """Trinity/DESeq2 reads a contrasts line 'A<TAB>B' as log2(A/B)."""
+
+    def test_default_is_every_pair_once_in_alphabetical_order(self):
+        self.assertEqual(
+            [("ctrl", "heat"), ("ctrl", "salt"), ("heat", "salt")],
+            st.pairwise_contrasts(["salt", "ctrl", "heat", "ctrl"]),
+        )
+
+    def test_reference_is_always_the_denominator(self):
+        self.assertEqual(
+            [("heat", "ctrl"), ("salt", "ctrl"), ("heat", "salt")],
+            st.pairwise_contrasts(["salt", "ctrl", "heat"], reference="ctrl"),
+        )
+
+    def test_reference_sorting_last_alphabetically(self):
+        self.assertEqual(
+            [("a", "b"), ("a", "z"), ("b", "z")],
+            st.pairwise_contrasts(["z", "a", "b"], reference="z"),
+        )
+
+    def test_unknown_reference_is_rejected(self):
+        with self.assertRaises(st.SampleTableError):
+            st.pairwise_contrasts(["ctrl", "heat"], reference="Ctrl")
+
+
 if __name__ == "__main__":
     unittest.main()

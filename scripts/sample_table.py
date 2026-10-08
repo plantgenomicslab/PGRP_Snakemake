@@ -78,6 +78,27 @@ def format_replication_relationship(pairs):
     return "".join(f"{treatment}\t{replicate}\n" for treatment, replicate in pairs)
 
 
+def pairwise_contrasts(treatments, reference=None):
+    """Return one (numerator, denominator) pair per unordered treatment pair.
+
+    Trinity's `run_DE_analysis.pl --method DESeq2` reports, for a contrasts
+    line `A<TAB>B`, log2FoldChange = log2(A / B): the first column is the
+    numerator. Pairs default to alphabetical order, which is rarely the
+    biologically meaningful direction. With `reference`, every pair containing
+    that treatment puts it second, so its fold changes read "vs reference".
+    """
+    levels = sorted(set(map(str, treatments)))
+    if reference is not None and reference not in levels:
+        raise SampleTableError(
+            f"reference treatment {reference!r} is not one of: {', '.join(levels)}"
+        )
+    pairs = []
+    for i, first in enumerate(levels):
+        for second in levels[i + 1 :]:
+            pairs.append((second, first) if first == reference else (first, second))
+    return pairs
+
+
 def load_sample_table(path=DEFAULT_SAMPLE_TABLE):
     """Read the control file into a DataFrame. Requires pandas."""
     import pandas as pd

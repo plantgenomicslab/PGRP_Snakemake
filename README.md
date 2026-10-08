@@ -25,7 +25,7 @@ git clone git@github.com:plantgenomicslab/PGRP_Snakemake.git
 ### Dependencies
 - Trim Galore 0.6.7
 - SRA Toolkit 2.11.0
-- STAR
+- STAR >= 2.7.11a (`alignRSEM` uses `--quantTranscriptomeSAMoutput`, which replaced `--quantTranscriptomeBan` in 2.7.11a; older STAR exits with `unrecognized parameter name`)
 - HTseq 1.99.2
 - Subread 2.0.1
 - multiqc 1.11
@@ -61,7 +61,7 @@ If `micromamba` is unavailable on your system, replace `micromamba` with `conda`
 # Create env + install all dependencies in one shot
 micromamba create -n PGRP_Snakemake -c bioconda -c conda-forge -c anaconda \
   python=3.7 \
-  tabulate=0.8.10 trim-galore=0.6.7 sra-tools=2.11.0 STAR htseq=1.99.2 \
+  tabulate=0.8.10 trim-galore=0.6.7 sra-tools=2.11.0 'star>=2.7.11a' htseq=1.99.2 \
   subread=2.0.1 multiqc=1.11 snakemake=7.24.0 parallel-fastq-dump=0.6.7 \
   bioconductor-tximport samtools=1.14 r-ggplot2 trinity=2.13.2 hisat2 \
   bioconductor-qvalue sambamba graphviz gffread tpmcalculator lxml rsem fastp=0.23.2
@@ -91,6 +91,18 @@ vdb-config  -i --interactive-mode textual
 # Set timeout to 100 seconds
 vdb-config -s /http/timeout/read=100000
 ```
+
+### Library strandedness
+
+Set `strandedness` in `config.yml` to match the library prep. One setting drives every read counter:
+
+| `strandedness` | Library | RSEM `--strandedness` | featureCounts `-s` | htseq-count `--stranded` |
+|---|---|---|---|---|
+| `none` (default) | unstranded | `none` | `0` | `no` |
+| `forward` | read 1 on the transcript strand (e.g. Ligation, Standard SOLiD) | `forward` | `1` | `yes` |
+| `reverse` | read 1 antisense: dUTP, Illumina TruSeq Stranded | `reverse` | `2` | `reverse` |
+
+Counting a stranded library as unstranded double-counts reads from overlapping antisense genes; counting it with the wrong direction discards most reads. If unsure, check STAR's `ReadsPerGene.out.tab` from the `align` rule: columns 3 and 4 hold the forward- and reverse-strand counts, and for a stranded library one of them is far larger than the other. `RSEM_strandedness` is accepted as an older name for the same key.
 
 ## Input Files
 ### Reference genome
@@ -143,7 +155,8 @@ naming. Both write to the current directory.
 ```bash
 # Paired-end reads named '<treatment>_rep<N>_R1.fastq.gz' / '..._R2.fastq.gz'.
 # Also writes a pairwise sample_contrasts file covering every treatment pair.
-./scripts/create_RunsbyExperiment.py /path/to/reads
+# --reference puts the named control second in every pair (see "DE contrast direction").
+./scripts/create_RunsbyExperiment.py /path/to/reads [--reference <control>]
 #   -> RunsByExperiment_<timestamp>.tsv   (Run, Treatment, Replicate, Sample)
 #   -> sample_contrasts_<timestamp>.tsv   (one treatment pair per line)
 # Rename/point config.yml at these before running the pipeline.
@@ -217,6 +230,18 @@ ZT4	ZT4_rep3
 ZT8	ZT8_rep1
 ZT8	ZT8_rep2
 ZT8	ZT8_rep3
+```
+
+#### DE contrast direction
+
+Each line of the `sample_contrast` file is one comparison, `A<TAB>B`. Trinity's `run_DE_analysis.pl --method DESeq2` turns it into `contrast=c("conditions", "A", "B")`, so **`log2FoldChange` = log2(A / B)**: positive means higher in `A`. Put the treatment first and the control second.
+
+`create_RunsbyExperiment.py` writes pairs in **alphabetical** order unless told otherwise, so with treatments `ctrl` and `heat` it writes `ctrl<TAB>heat` and every heat-induced gene comes out with a *negative* fold change. Either re-run it with `--reference ctrl`, which writes `heat<TAB>ctrl`, or edit the generated file by hand and swap the columns before running DEG analysis. The direction also sets the output file names (`..._A_vs_B.DESeq2.DE_results`).
+
+```
+# Example: sample_contrasts.tsv for log2(heat / ctrl) and log2(salt / ctrl)
+heat	ctrl
+salt	ctrl
 ```
 
 ## Optional: BBDuk pre-alignment contaminant filter
@@ -309,6 +334,8 @@ sbatch --mem=4g \
        -e snakemake.err \
        --wrap="./run.sh"
 ```
+
+`run.sh` passes `config.yml` as `--cluster-config`, where each resource block is looked up by **rule name** (`align`, `alignRSEM`, `calculateRSEMExpression`, `trim_PAIRED`, ...). A block whose name matches no rule is silently ignored and that rule is submitted with the `__default__` resources (2 CPUs, 8 GB) — too little for STAR, whose `alignRSEM` sorting buffer alone is 20 GB. Rule names are listed by `snakemake --list`.
 ## Upgrading an existing checkout
 
 If you already have a working directory with results in it, pulling is safe for your data but needs one manual step.
@@ -337,6 +364,8 @@ bash run.sh
 Two things you may notice on the next run:
 
 - **`replication_relationship.txt` gets shorter.** It used to list one line per sequencing *run*, so replicates spanning several runs appeared more than once. It is now one line per replicate. If you have edited the file by hand, the pipeline detects that its contents disagree with `RunsByExperiment.tsv`, leaves it alone, and prints a warning naming the differences — delete the file, or run `scripts/make_replication_relationship.py --force`, to go back to a generated one.
+- **Cluster resources for STAR/RSEM.** Older `config.yml` files named these blocks `align_PAIRED`, `alignRSEM_PAIRED`, `calculateRSEMExpression_PAIRED` (and `_SINGLE`), which match no rule, so those jobs ran on the 2 CPU / 8 GB `__default__`. If you keep your own `config.yml`, rename them to `align`, `alignRSEM` and `calculateRSEMExpression` (and `importRaw_paired`/`_single` to `importRaw_PAIRED`/`_SINGLE`), and add `strandedness:` (see *Library strandedness*).
+- **Some finished rules want to re-run.** Snakemake 7 re-runs a rule when its code changes, and `trim_*`, `alignRSEM`, `calculateRSEMExpression`, `featureCounts` and `HTseq` changed (strandedness, STAR >= 2.7.11a option, log handling). With `strandedness: none` their results are unchanged; to keep existing outputs, add `--rerun-triggers mtime` to the `snakemake` call once.
 - **A stray `refcds_length.tsv` next to your reference directory.** HTseq normalization used to write `cds_length.tsv` by gluing the filename onto `genomeDir`, landing it one level up. It now goes inside `genomeDir`. The old file is orphaned and can be deleted.
 
 ## error checking
